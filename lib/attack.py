@@ -11,13 +11,22 @@ def int2bin(n, length):
     bin_list = list(bin(n)[2:].zfill(length))
     return GF(bin_list)
 
+def solvesystem(M):
+    '''
+    Solve M s = 0
+    '''
+    assert len(M) != 0
+    s = GF(M).null_space()
+    assert np.all(M @ s.transpose() == 0)
+    return s
+
 
 class IPAttack:
     '''
-    The attack algorithm and its analysis.
+    The inner-product attack algorithm and its analysis.
     '''
     def __init__(self, P):
-        self.P = P.view(GF)
+        self.P = P.astype(int).view(GF)
         self.n_col = P.shape[1]
         self.rng = default_rng()
         self.d = self.rng.choice(2, size = self.n_col).view(GF)
@@ -78,6 +87,9 @@ class IPAttack:
 
 
 class KMAttack(IPAttack):
+    '''
+    Kahanamoku-Meyer's attack algorithm
+    '''
     def check_weight(self, s):
         '''Check whether Hamming weight of each columns is 0 or 3'''
         P_s = self.get_P_s(s)
@@ -100,17 +112,6 @@ class KMAttack(IPAttack):
         return GF(candidate)
 
 
-
-
-def solvesystem(M):
-    '''
-    Solve M s = 0
-    '''
-    assert len(M) != 0
-    s = GF(M).null_space()
-    assert np.all(M @ s.transpose() == 0)
-    return s
-    
 
 
 
