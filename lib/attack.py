@@ -2,31 +2,17 @@
 import numpy as np
 from numpy.random import default_rng
 import galois
+from .utils import int2bin, solvesystem
 
 GF = galois.GF(2)
 
 # %%
-def int2bin(n, length):
-    '''Convert the integer `n` into binary representation of length `length`'''
-    bin_list = list(bin(n)[2:].zfill(length))
-    return GF(bin_list)
-
-def solvesystem(M):
-    '''
-    Solve M s = 0
-    '''
-    assert len(M) != 0
-    s = GF(M).null_space()
-    assert np.all(M @ s.transpose() == 0)
-    return s
-
-
 class IPAttack:
     '''
     The inner-product attack algorithm and its analysis.
     '''
     def __init__(self, P):
-        self.P = P.astype(int).view(GF)
+        self.P = P
         self.n_col = P.shape[1]
         self.rng = default_rng()
         self.d = self.rng.choice(2, size = self.n_col).view(GF)
@@ -85,6 +71,12 @@ class IPAttack:
             M.append(np.sum(P_de, axis = 0))
         return GF(M)
 
+    def print_candidate_secret(self, S):
+        '''
+        Add a rank checking step.
+        '''
+        pass
+
 
 class KMAttack(IPAttack):
     '''
@@ -93,22 +85,25 @@ class KMAttack(IPAttack):
     def check_weight(self, s):
         '''Check whether Hamming weight of each columns is 0 or 3'''
         P_s = self.get_P_s(s)
-        max_iter = 40 
+        max_iter = 40 # max number of codewords to be checked
         for _ in range(max_iter):
             x = self.rng.choice(2, size = self.n_col).view(GF)
-            c = P_s @ x.reshape(-1, 1)
+            c = P_s @ x.reshape(-1, 1) # a random codeword
             weight = np.sum(c.view(np.ndarray)) % 4
             if weight != 0 and weight != 3:
                 return False
         return True
 
-    def print_candidate_secret(self, S):
+    def print_candidate_secret(self, S, print_rank = False):
         '''Print all candidate secrets that satisfy the weight constraint'''
         candidate = []
-        for i in range(1, 2**(len(S))):
-            s = int2bin(i, len(S)) @ S
-            if KMA.check_weight(s):
+        rank = []
+        for s in S:
+            rank.append(self.get_Gs_rank(s))
+            if self.check_weight(s):
                 candidate.append(s)
+        if print_rank == True:
+            print(rank)
         return GF(candidate)
 
 
@@ -116,18 +111,4 @@ class KMAttack(IPAttack):
 
 
 
-# %%
-if __name__ == "__main__":
-    P = np.loadtxt("../examples/4qubit_1110.prog", dtype = int)
-    # P = np.loadtxt("../examples/5qubit_QRC.prog", dtype = int)
-    # P = np.loadtxt("../examples/challenge.xprog", dtype = int)
-    # print(GF(P))
-    KMA = KMAttack(P)
-    # KMA.regenerate_d()
-    M = KMA.get_M(1000)
-    S = solvesystem(M)
-    # for i in range(1, 2**(len(S))):
-    #     s = int2bin(i, len(S)) @ S
-    #     if KMA.check_weight(s):
-    #         print(s)
-    print(KMA.print_candidate_secret(S))
+
