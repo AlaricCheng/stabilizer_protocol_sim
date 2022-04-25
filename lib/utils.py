@@ -44,6 +44,13 @@ def solvesystem(A, b = None, all_sol = False):
             return [] 
 
 
+def rank(A):
+    '''
+    Return the rank of a matrix A.
+    '''
+    return np.sum(~np.all(A.row_reduce() == 0, axis=1))
+
+
 # %%
 if __name__ == "__main__":
     tab = np.loadtxt("../examples/4qubit_rank_1.tab", dtype = int)

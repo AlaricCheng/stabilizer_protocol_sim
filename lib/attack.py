@@ -15,13 +15,16 @@ class IPAttack:
         self.P = P
         self.n_col = P.shape[1]
         self.rng = default_rng()
-        self.d = self.rng.choice(2, size = self.n_col).view(GF)
+        self.d = GF.Random(self.n_col, seed = self.rng)
+
+    def set_rng(self, rng):
+        self.rng = rng
 
     def get_d(self):
         return self.d
 
-    def regenerate_d(self):
-        self.d = self.rng.choice(2, size = self.n_col).view(GF)
+    def regenerate_d(self, seed = None):
+        self.d = GF.Random(self.n_col, seed = seed)
 
     def set_d(self, d):
         self.d = GF(d)
