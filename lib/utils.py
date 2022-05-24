@@ -30,7 +30,7 @@ def solvesystem(A, b = None, all_sol = False):
             return GF(complete_set)
         return null
     else: # b != 0
-        assert A.shape[1] == b.shape[0], "Inconsistent shapes"
+        assert A.shape[0] == b.shape[0], "Inconsistent shapes"
         Ab = np.hstack((A, b.reshape(-1, 1)))
         Ab_reduced = Ab.row_reduce() # Gaussian elimination
         A = Ab_reduced[:, :n]
