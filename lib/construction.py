@@ -1,24 +1,11 @@
-# %%
+from typing import Union
 import numpy as np
 from numpy.random import default_rng
 import galois
-# import stim
-from .utils import solvesystem
+from .utils import solvesystem, wrap_seed
+import itertools
 
 GF = galois.GF(2)
-
-# %%
-def wrap_seed(seed):
-    '''
-    Convert seed into a np.random.Generator
-    '''
-    if seed is None or type(seed) == int:
-        rng = default_rng(seed)
-    elif type(seed) == np.random.Generator:
-        rng = seed
-    else:
-        raise ValueError("Seed must be an integer, a numpy.random.Generator or None.")
-    return rng
 
 
 def random_main_part(n, g, s, seed = None):
@@ -59,7 +46,6 @@ def random_gram(n, g, s, seed = None):
     G = H.T @ H
     return G
 
-
 def random_tableau(n, g, s, seed = None):
     '''
     Generate a random stabilizer tableau whose X-part is the Gram matrix, and Z-part is identity. The Gram matrix has rank <= g. 
@@ -78,24 +64,34 @@ def random_tableau(n, g, s, seed = None):
     stab_tab = np.hstack((G, GF.Identity(n), r))
     return stab_tab
 
-
 def add_row_redundancy(H, s, size, seed = None):
     '''
     Given the main part and secret, append redundant rows (number of rows given by size).
+    Args:
+        H (galois.FieldArray): binary matrix to be appended redundant rows
+        s (galois.FieldArray): secret vector
+        size (int): number of redundant rows
+        seed (int | np.random.Generator): seed for random sampling
     '''
+    if size == 0:
+        return H
     H_R = []
     n = H.shape[1]
     rng = wrap_seed(seed)
     while len(H_R) < size:
         row = GF.Random(n, seed = rng)
-        if np.dot(row, s) == 0 and np.any(row != 0):
+        if np.dot(row, s) == 0 and np.any(row != 0): # exclude all-zero rows
             H_R.append(row)
     return np.append(H, H_R, axis = 0)
-
 
 def add_col_redundancy(H_M, s, size, seed = None):
     '''
     Given the main part and the secret, append random codewords to the columns of H_M. 
+    Args:
+        H_M (galois.FieldArray): binary matrix to be appended redundant columns
+        s (galois.FieldArray): secret vector
+        size (int): number of redundant rows
+        seed (int | np.random.Generator): seed for random sampling
     Return:
         Tuple(H_M, s)
     '''
@@ -111,23 +107,29 @@ def add_col_redundancy(H_M, s, size, seed = None):
     return new_H_M, new_s
 
 
-
-
-# %%
 class Factorization:
-    def __init__(self, tab, s = None):
+    def __init__(
+        self, 
+        tab: 'galois.FieldArray', 
+        s: Union['galois.FieldArray', None] = None
+    ):
         '''
         Given a stabilizer tableau, return a factorization of the Gram matrix satisfying the weight and codeword constraints.
         '''
-        self.tab = tab #.astype(int).view(GF)
-        self.s = s
+        self.tab = tab 
         self.n = len(self.tab)
-        G = tab[:, 0:self.n]
+        G = tab[:, :self.n]
         assert np.all(G == G.T), "G must be symmetric"
-        self.G = G #.astype(int).view(GF)
+        self.G = G 
         self.rng = default_rng()
+        if s is None:
+            s = self.self_consistent_eqn(one_sol=True) 
+        self.s = s
 
-    def get_weight(self):
+    def set_rng(self, seed):
+        self.rng = wrap_seed(seed)
+
+    def get_weight(self): # TODO
         '''
         Get weight constraint from the stabilizer tableau.
         '''
@@ -138,7 +140,40 @@ class Factorization:
             weight = f"{r[i]}" + f"{self.G[i, i]}"
             weights.append(weight_dict[weight])
         return np.array(weights)
-        
+
+    def forward_evolution(self, row):
+        '''
+        Evolve the stabilizer tableau after applying e^{i pi X_p /4}
+        '''
+        indices = row.nonzero()[0]
+        for idx in indices: # update phase
+            if self.tab[idx, idx] == 1:
+                self.tab[idx, 2*self.n] += GF(1)
+        for idx in itertools.product(indices, repeat = 2): # update gram matrix
+            self.tab[idx] += GF(1)
+        self.__init__(self.tab, self.s)
+
+    def backward_evolution(self, row):
+        '''
+        Evolve the stabilizer tableau after applying e^{-i pi X_p /4}
+        '''
+        indices = row.nonzero()[0]
+        for idx in indices: # update phase
+            if self.tab[idx, idx] == 0:
+                self.tab[idx, 2*self.n] += GF(1)
+        for idx in itertools.product(indices, repeat = 2): # update gram matrix
+            self.tab[idx] += GF(1)
+        self.__init__(self.tab, self.s)
+
+    def obfuscation(self, n_rows):
+        '''
+        Obfuscation of stabilizer tableau
+        '''
+        H_obf = random_main_part(self.n, n_rows, self.s, seed = self.rng)
+        for row in H_obf:
+            self.backward_evolution(row)
+        return H_obf
+
     def init_factor(self):
         '''
         Construct the initial factorization, based on [Lempel 75]. 
@@ -185,42 +220,45 @@ class Factorization:
         else:
             return candidate
 
-    def injecting_ones(self, E, s = None):
+    def injecting_ones(self, E):
         '''
         Injection subroutine to inject the all-one codeword.
         '''
-        if s is None:
-            s = self.self_consistent_eqn(one_sol=True) 
-            self.s = s
-        indicator = E @ s.reshape(-1, 1) # indicator to separate two parts
+        indicator = E @ self.s.reshape(-1, 1) # indicator to separate two parts
         F = E[indicator.nonzero()[0]] # F.s = 1
         Z = E[np.where(indicator == 0)[0]] # Z.s = 0
         if len(Z) % 2 != 0:
             zeros = GF.Zeros((1, self.n))
             Z = np.append(Z, zeros, axis = 0)
         x = GF.Zeros(self.n)
-        flip_idx = self.rng.choice(s.nonzero()[0]) # only a special case
+        flip_idx = self.rng.choice(self.s.nonzero()[0]) # only a special case
         x[flip_idx] = 1
         ones = GF.Ones((len(Z), 1))
         Z = Z + ones @ x.reshape(1, -1)
         return np.append(F, Z, axis = 0)
 
-
-    def final_factor(self):
+    def final_factor(self, obf_rows = None):
         '''
         Combine the subroutines to generate the final factorization.
+        Args
+            obf_rows: for stabilizer tableau obfuscation
         '''
+        if obf_rows is None:
+            obf_rows = self.n
+        H_obf = self.obfuscation(obf_rows)
         E_init = self.init_factor()
         E = self.satisfy_weight_constraint(E_init)
-        H = self.injecting_ones(E, self.s)
+        H = self.injecting_ones(E)
         H = self.satisfy_weight_constraint(H)
-        return H
+        if obf_rows == 0:
+            return H
+        else:
+            return np.vstack((H_obf, H))
 
 
-
-# %%
 class QRCConstruction:
     def __init__(self, q):
+        # choices of q: [7, 23, 31, 47, 71, 79, 103, 127, 151, 167, 191, 199, 223, 239, 263, 271, 311, 359, 367, 383, 431, 439, 463, 479, 487, 503, 599, 607, 631, 647, 719, 727, 743, 751, 823, 839, 863, 887, 911, 919, 967, 983, 991]
         assert (q+1)%8 == 0, "(q + 1) must divide 8"
         self.q = q # size parameter
         self.n = int((q+3)/2) # num of qubits
@@ -262,7 +300,6 @@ class QRCConstruction:
         P_j = self.P_s[:, j]
         P_i = P_i + P_j
         self.P_s[:, i] = P_i
-
 
     def obfuscation(self, times, seed = None):
         '''

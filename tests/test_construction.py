@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 from lib.construction import *
 
 rank = lambda A: np.sum(~np.all(A.row_reduce() == 0))
@@ -24,8 +25,23 @@ def test_random_object(n, g):
     assert rank(G) == rank(np.hstack((G, r))) # test consistency 
 
 
-def test_add_redundancy():
-    pass
+def test_add_row_redundancy():
+    s = GF([1,0,1,0,1])
+    H_M = random_main_part(5, 2, s)
+    m = len(H_M)
+    H = add_row_redundancy(H_M, s, 10)
+    a = GF.Zeros((len(H), 1))
+    for i in range(m):
+        a[i] = 1
+    assert np.all(H @ s.reshape(-1, 1) == a)
+
+
+def test_add_col_redundancy():
+    s = GF([1,0,1,0,1])
+    H_M = random_main_part(5, 4, s)
+    H_M, s = add_col_redundancy(H_M, s, 10)
+    assert H_M.shape == (4, 15)
+    assert np.all(H_M @ s.reshape(-1, 1) == 1)
 
 
 @pytest.mark.parametrize("n", [10, 20, 30])
@@ -34,7 +50,15 @@ class TestFactorization:
     def test_final_factor(self, n, g):
         s = GF.Random(n)
         tab = random_tableau(n, g, s)
-        fac = Factorization(tab, s)
+        fac = Factorization(tab.copy(), s)
         H = fac.final_factor()
         assert np.all(tab[:, :n] == H.T @ H)
         assert np.all(H @ s.reshape(-1, 1) == 1)
+
+        fac1 = Factorization(tab.copy(), s)
+        for row in H:
+            fac1.backward_evolution(row)
+        assert np.all(fac1.G == 0)
+        assert np.all(fac1.tab[:, 2*n] == 0)
+
+    

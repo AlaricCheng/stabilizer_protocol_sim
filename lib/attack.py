@@ -2,11 +2,10 @@
 import numpy as np
 from numpy.random import default_rng
 import galois
-from .utils import int2bin, solvesystem
 
 GF = galois.GF(2)
 
-# %%
+
 class IPAttack:
     '''
     The inner-product attack algorithm and its analysis.
@@ -74,11 +73,19 @@ class IPAttack:
             M.append(np.sum(P_de, axis = 0))
         return GF(M)
 
-    def print_candidate_secret(self, S):
+    def print_candidate_secret(self, S, threshold = 5, print_rank = False):
         '''
         Add a rank checking step.
         '''
-        pass
+        candidate = []
+        rank = []
+        for s in S:
+            rank.append(self.get_Gs_rank(s))
+            if self.get_Gs_rank(s) <= threshold:
+                candidate.append(s)
+        if print_rank == True:
+            print(rank)
+        return GF(candidate)
 
 
 class KMAttack(IPAttack):
@@ -108,10 +115,3 @@ class KMAttack(IPAttack):
         if print_rank == True:
             print(rank)
         return GF(candidate)
-
-
-
-
-
-
-

@@ -1,4 +1,5 @@
 # %%
+from typing import Union
 import numpy as np
 from numpy.random import default_rng
 import galois
@@ -6,6 +7,18 @@ import galois
 GF = galois.GF(2)
 
 # %%
+def wrap_seed(seed):
+    '''
+    Convert seed into a np.random.Generator
+    '''
+    if seed is None or type(seed) == int:
+        rng = default_rng(seed)
+    elif type(seed) == np.random.Generator:
+        rng = seed
+    else:
+        raise ValueError("Seed must be an integer, a numpy.random.Generator or None.")
+    return rng
+
 def int2bin(n, length):
     '''
     Convert the integer `n` into binary representation of length `length`
@@ -13,14 +26,18 @@ def int2bin(n, length):
     bin_list = list(bin(n)[2:].zfill(length))
     return GF(bin_list)
 
-def solvesystem(A, b = None, all_sol = False):
+def solvesystem(
+    A: Union['np.ndarray', 'galois.FieldArray'], 
+    b: Union['np.ndarray', 'galois.FieldArray', None] = None, 
+    all_sol: bool = False
+):
     '''
     Solve A x = b over GF(2)
     '''
     assert len(A) != 0, "Empty matrix!"
     A = A.view(GF)
     n = A.shape[1] # n_cols
-    null = A.null_space()
+    null = A.null_space() # basis matrix of null space
     if all_sol == True:
         complete_set = [int2bin(i, len(null)) @ null for i in range(1, 2**(len(null)))] # # linear combination of all vectors in null space
 
@@ -33,16 +50,34 @@ def solvesystem(A, b = None, all_sol = False):
         assert A.shape[0] == b.shape[0], "Inconsistent shapes"
         Ab = np.hstack((A, b.reshape(-1, 1)))
         Ab_reduced = Ab.row_reduce() # Gaussian elimination
-        A = Ab_reduced[:, :n]
-        b = Ab_reduced[:, n]
-        free_var = np.all(A == 0, axis=1).nonzero()[0] # indices for free variables
-        if np.all(b[free_var] == 0): 
+        A_rd = Ab_reduced[:, :n]
+        b_rd = Ab_reduced[:, n]
+        free_var = np.all(A_rd == 0, axis=1).nonzero()[0] # indices for free variables
+        if np.all(b_rd[free_var] == 0): 
+            s_sol = specific_sol(A_rd, b_rd)
             if all_sol == True:
-                return GF(complete_set) + b
-            return b, null
+                return np.vstack((s_sol, GF(complete_set) + s_sol))
+            return s_sol, null
         else: # case: no solution
             return [] 
 
+def specific_sol(A, b):
+    '''
+    [A, b] should be in the row reduced form
+    '''
+    m, n = A.shape
+    s_sol = GF.Zeros(n)
+    for idx in range(m):
+        A_i = A[-1+idx]
+        b_i = b[-1+idx]
+        nonzero_idx = A_i.nonzero()[0]
+        if b_i == 0:
+            s_sol[nonzero_idx] = 0
+        elif b_i == 1 and len(nonzero_idx) == 1:
+            s_sol[nonzero_idx] = 1
+        elif b_i == 1 and len(nonzero_idx) > 1:
+            s_sol[nonzero_idx[0]] = 1
+    return s_sol
 
 def rank(A):
     '''
@@ -50,10 +85,3 @@ def rank(A):
     '''
     return np.sum(~np.all(A.row_reduce() == 0, axis=1))
 
-
-# %%
-if __name__ == "__main__":
-    tab = np.loadtxt("../examples/4qubit_rank_1.tab", dtype = int)
-    A = tab[:, :4]
-    b = GF([1, 1, 1, 1])
-    print(solvesystem(A, b, all_sol=False))
