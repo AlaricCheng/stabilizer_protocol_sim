@@ -7,6 +7,11 @@ import itertools
 
 GF = galois.GF(2)
 
+__all__ = [
+    "random_main_part", "random_gram", "random_tableau",
+    "add_row_redundancy", "add_col_redundancy", 
+    "Factorization", "QRCConstruction"
+]
 
 def random_main_part(n, g, s, seed = None):
     '''
@@ -102,8 +107,16 @@ def add_col_redundancy(H_M, s, size, seed = None):
         x = GF.Random((n, 1), seed = rng)
         codeword = H_M @ x # random linear combination of cols in H_M
         ext_col.append(codeword)
-    new_H_M = np.hstack((H_M, *ext_col)) # append random cols to the right of H_M
-    new_s = np.append(s, GF.Zeros(size))
+
+    ext_col: galois.FieldArray = np.hstack(ext_col)
+    s_prime = ext_col.null_space()
+    if len(s_prime) == 0:
+        s_prime = GF.Zeros(size)
+    else:
+        s_prime = default_rng().choice(s_prime)
+
+    new_H_M = np.hstack((H_M, ext_col)) # append random cols to the right of H_M
+    new_s = np.append(s, s_prime)
     return new_H_M, new_s
 
 
@@ -116,7 +129,7 @@ class Factorization:
         '''
         Given a stabilizer tableau, return a factorization of the Gram matrix satisfying the weight and codeword constraints.
         '''
-        self.tab = tab 
+        self.tab = tab.copy()
         self.n = len(self.tab)
         G = tab[:, :self.n]
         assert np.all(G == G.T), "G must be symmetric"
@@ -258,7 +271,7 @@ class Factorization:
 
 class QRCConstruction:
     def __init__(self, q):
-        # choices of q: [7, 23, 31, 47, 71, 79, 103, 127, 151, 167, 191, 199, 223, 239, 263, 271, 311, 359, 367, 383, 431, 439, 463, 479, 487, 503, 599, 607, 631, 647, 719, 727, 743, 751, 823, 839, 863, 887, 911, 919, 967, 983, 991]
+        # a valid q can be obtained from lib.construction.q_helper
         assert (q+1)%8 == 0, "(q + 1) must divide 8"
         self.q = q # size parameter
         self.n = int((q+3)/2) # num of qubits
@@ -310,7 +323,22 @@ class QRCConstruction:
             i, j = rng.choice(self.n, size = 2, replace = False)
             self.ColAdd(i, j)
 
+def is_prime(n):
+    if n % 2 == 0 and n > 2: 
+        return False
+    return all(n % i for i in range(3, int(np.sqrt(n)) + 1, 2))
 
+def q_helper(N):
+    '''
+    Return the list of valid q smaller than N for QRC.
+    '''
+    assert type(N) == int, "N must be integer"
+    a = np.arange(7, N, 8)
+    foo = np.vectorize(is_prime)
+    pbools = foo(a)
+    q_list = np.extract(pbools, a)
+    return q_list
 
+    # [7, 23, 31, 47, 71, 79, 103, 127, 151, 167, 191, 199, 223,  239, 263, 271, 311, 359, 367, 383, 431, 439, 463, 479, 487, 503,  599, 607, 631, 647, 719, 727, 743, 751, 823, 839, 863, 887, 911,  919, 967, 983, 991]
 
 

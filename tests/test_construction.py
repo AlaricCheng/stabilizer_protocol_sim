@@ -1,6 +1,10 @@
 import pytest
 import numpy as np
+from numpy.random import default_rng
+import galois
 from lib.construction import *
+
+GF = galois.GF(2)
 
 rank = lambda A: np.sum(~np.all(A.row_reduce() == 0))
 
