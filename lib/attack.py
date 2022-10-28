@@ -54,17 +54,20 @@ class IPAttack:
         nullity = len(G_s.null_space())
         return self.n_col - nullity
 
-    def get_M(self, num_e):
+    def get_M(self, size):
         '''
         Generate the linear system M
         '''
-        idx = self.P @ self.d.reshape(-1, 1)
-        P_d = self.P[idx.flatten().view(np.ndarray).astype(bool)]
-        # P_d = GF([p for p in self.P if np.dot(p, self.d) == 1])
-        if len(P_d) == 0:
-            return []
+        for _ in range(20):
+            idx = self.P @ self.d.reshape(-1, 1)
+            P_d = self.P[idx.flatten().view(np.ndarray).astype(bool)]
+            # P_d = GF([p for p in self.P if np.dot(p, self.d) == 1])
+            if len(P_d) != 0:
+                break
+            else:
+                self.regenerate_d()
         M = []
-        for _ in range(num_e):
+        while len(M) < size:
             e = self.rng.choice(2, size = self.n_col).view(GF)
             idx = P_d @ e.reshape(-1, 1)
             P_de = P_d[idx.flatten().view(np.ndarray).astype(bool)]

@@ -5,6 +5,19 @@ from numpy.random import default_rng
 import galois
 import lib
 from lib.utils import solvesystem, rank
+import matplotlib.pyplot as plt
+from time import perf_counter
+from tqdm import tqdm, trange
+import os, sys
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 GF = galois.GF(2)
 
@@ -91,6 +104,82 @@ def generate_stab_instance(
 
     return H, s
 
+
+def sol_size_qrc(q):
+    '''
+    Get size of solution set
+    '''
+    dim_sol = []
+    for rd_col in trange(1, q, 10):
+        tmp = []
+        with HiddenPrints():
+            H, s = generate_QRC_instance(q, q, rd_col)
+        for _ in range(10):
+            KMA = lib.KMAttack(H)
+            M = KMA.get_M(1000)
+            S = solvesystem(M)
+            tmp.append(len(S))
+        dim_sol.append(tmp)
+    
+    return dim_sol
+
+
+def attack_succ_qrc(q, thres = 15, rep = 20, lim = 30):
+    '''
+    Args
+        lim: 
+    '''
+    start_pt = int((q+1)/2) - 15
+    succ_prob = {}
+    for rd_col in trange(start_pt, start_pt+lim, 3):
+        with HiddenPrints():
+            H, s = generate_QRC_instance(q, q, rd_col)
+        # print("Secret:", s)
+        count = 0
+        for _ in range(rep):
+            KMA = lib.KMAttack(H)
+            M = KMA.get_M(1000)
+            # print(len(M))
+            S = solvesystem(M)
+            # print("Correct d:", KMA.check_d(s), "\tDimension of solution space:", len(S))
+            if len(S) < thres:
+                S = solvesystem(M, all_sol=True)
+            cand_s = KMA.print_candidate_secret(S)
+            # print(cand_s)
+            if s.tolist() in cand_s.tolist():
+                count += 1
+        succ_prob[rd_col] = count/rep
+
+    return succ_prob
+
+
+def draw_fig(idx):
+    if idx == 1:
+        fig, ax = plt.subplots()
+        for q in [103, 127, 151, 167, 191]:
+            dim_sol = sol_size_qrc(q) 
+            ax.errorbar(range(1, q, 10), np.mean(dim_sol, axis = 1), yerr=np.std(dim_sol, axis = 1), marker = "*", label = f"q = {q}")
+
+        ax.set_xlabel("Number of redundant columns")
+        ax.set_ylabel("Dimension of solution space")
+        ax.legend()
+
+        fig.savefig("./fig/sol_size.svg", bbox_inches = "tight")
+    elif idx == 2:
+        fig, ax = plt.subplots()
+        for q in [103, 127, 151, 167, 191]:
+            succ_prob = attack_succ_qrc(q, thres = args.thres, rep = args.rep)
+            ax.plot(succ_prob.keys(), succ_prob.values(), "^", label = f"q = {q}")
+
+        ax.set_xlabel("Number of redundant columns")
+        ax.set_ylabel("Success probability")
+        ax.legend()
+
+        fig.savefig("./fig/succ_prob.svg", bbox_inches = "tight")
+
+
+
+
 # %%
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -119,6 +208,12 @@ if __name__ == "__main__":
 
     parser.add_argument("-v", "--verbose", action = "store_true", help = "verbose")
 
+    # figure
+    group_fig = parser.add_argument_group()
+    group_fig.add_argument("--fig", type = int, help = "draw figure")
+    group_fig.add_argument("--thres", type = int, default = 15, help = "Threshold of solution space dimension")
+    group_fig.add_argument("--rep", type = int, default=20, help = "Number of repetitions for attacking each instance")
+
     args = parser.parse_args()
     
     # generate H and s
@@ -134,6 +229,10 @@ if __name__ == "__main__":
     # attack
     if args.attack:
         attack(H, s, correct_d = args.correct_d)
+
+    # figure
+    if args.fig:
+        draw_fig(args.fig)
     
 
 
