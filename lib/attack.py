@@ -39,7 +39,8 @@ class IPAttack:
 
     def check_d(self, s):
         '''
-        Check whether d is in the null space of G_s
+        Check whether d is in the null space of G_s. 
+        This is only for testing purpose, and not for the actual attack
         '''
         P_s = self.get_P_s(s)
         G_s = P_s.T @ P_s
@@ -100,8 +101,8 @@ class KMAttack(IPAttack):
         P_s = self.get_P_s(s)
         max_iter = 40 # max number of codewords to be checked
         for _ in range(max_iter):
-            x = self.rng.choice(2, size = self.n_col).view(GF)
-            c = P_s @ x.reshape(-1, 1) # a random codeword
+            x = GF.Random((self.n_col, 1), seed = self.rng)
+            c = P_s @ x # a random codeword
             weight = np.sum(c.view(np.ndarray)) % 4
             if weight != 0 and weight != 3:
                 return False
@@ -118,3 +119,25 @@ class KMAttack(IPAttack):
         if print_rank == True:
             print(rank)
         return GF(candidate)
+
+    def classical_sampling(self, S, n_samples):
+        '''
+        Generate the samples to pass the verifier's test
+        '''
+        S = GF(S)
+        if len(S.shape) == 1:
+            S = S.reshape(1, -1)
+        X = []
+        while len(X) < n_samples:
+            x = GF.Random(self.n_col)
+            coin = self.rng.choice(2, p = (0.854, 1-0.854))
+            if S @ x.reshape(-1, 1) == 0:
+                if coin == 0:
+                    X.append(x)
+            else:
+                if coin == 1:
+                    X.append(x)
+        
+        return X
+
+

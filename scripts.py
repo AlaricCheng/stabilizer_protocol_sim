@@ -4,20 +4,11 @@ import numpy as np
 from numpy.random import default_rng
 import galois
 import lib
-from lib.utils import solvesystem, rank
+from lib.utils import solvesystem, rank, HiddenPrints
+from lib.construction import generate_QRC_instance
 import matplotlib.pyplot as plt
 from time import perf_counter
 from tqdm import tqdm, trange
-import os, sys
-
-class HiddenPrints:
-    def __enter__(self):
-        self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = self._original_stdout
 
 GF = galois.GF(2)
 
@@ -45,28 +36,6 @@ def attack(H, s, num_samples = 1000, correct_d = False):
             print("secret found: s = ", s0)
             break
         print(_rank)
-
-
-def generate_QRC_instance(
-    q: int, 
-    rd_row: int = 0, 
-    rd_col: int = 0
-):
-    '''
-    Args:
-        q: size parameter for QRC
-        rd_row: number of redundant rows
-        rd_col: number of redundant columns
-    '''
-    QRC = lib.QRCConstruction(q) # initialization
-    QRC.obfuscation(1000)
-    H_M = QRC.P_s
-    s = QRC.s
-    H_M, s = lib.add_col_redundancy(H_M, s, rd_col)
-    H = lib.add_row_redundancy(H_M, s, rd_row)
-    print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
-
-    return H, s
 
 
 def generate_stab_instance(
@@ -124,8 +93,9 @@ def sol_size_qrc(q):
     return dim_sol
 
 
-def attack_succ_qrc(q, thres = 15, rep = 100, lim = 40):
+def attack_succ_qrc_secret(q, thres = 15, rep = 100, lim = 40):
     '''
+    Probability that the real secret is in the candidate set
     Args
         lim: 
     '''
@@ -139,7 +109,6 @@ def attack_succ_qrc(q, thres = 15, rep = 100, lim = 40):
         for _ in range(rep):
             KMA = lib.KMAttack(H)
             M = KMA.get_M(1000)
-            # print(len(M))
             S = solvesystem(M)
             # print("Correct d:", KMA.check_d(s), "\tDimension of solution space:", len(S))
             if len(S) < thres:
@@ -147,6 +116,34 @@ def attack_succ_qrc(q, thres = 15, rep = 100, lim = 40):
             cand_s = KMA.print_candidate_secret(S)
             # print(cand_s)
             if s.tolist() in cand_s.tolist():
+                count += 1
+        succ_prob[rd_col] = count/rep
+
+    return succ_prob
+
+
+def attack_succ_qrc_test(q, rep = 100, lim = 40):
+    '''
+    Probability that the prover's samples pass the verifier's test
+    Args
+        lim: 
+    '''
+    start_pt, end_pt = int((q+1)/2 - lim/2), int((q+1)/2 + lim)
+    succ_prob = {}
+    for rd_col in trange(start_pt, end_pt, 4):
+        with HiddenPrints():
+            H, s = generate_QRC_instance(q, q, rd_col)
+        # print("Secret:", s)
+        count = 0
+        for _ in range(rep):
+            KMA = lib.KMAttack(H)
+            while KMA.check_d(s) is False:
+                KMA.regenerate_d()
+            M = KMA.get_M(1000)
+            S = solvesystem(M)
+            cand_s = GF.Random((1, len(S))) @ S
+            X = KMA.classical_sampling(cand_s, 10000)
+            if lib.hypothesis_test(s, X, 0.854):
                 count += 1
         succ_prob[rd_col] = count/rep
 
@@ -169,17 +166,32 @@ def draw_fig(idx):
         fig, ax = plt.subplots()
         succ_prob_all = []
         for q in [103, 127, 151, 167, 191]:
-            succ_prob = attack_succ_qrc(q, thres = args.thres, rep = args.rep)
+            succ_prob = attack_succ_qrc_secret(q, thres = args.thres, rep = args.rep)
             ax.plot(succ_prob.keys(), succ_prob.values(), "^--", label = f"q = {q}")
             succ_prob_all.append([[key, succ_prob[key]] for key in succ_prob])
 
-        np.save("./tmp.npy", succ_prob_all)
+        np.save("./succ_prob_secret.npy", succ_prob_all)
 
         ax.set_xlabel("Number of redundant columns")
         ax.set_ylabel("Success probability")
         ax.legend()
 
-        fig.savefig("./fig/succ_prob.svg", bbox_inches = "tight")
+        fig.savefig("./fig/succ_prob_secret.svg", bbox_inches = "tight")
+    elif idx == 3:
+        fig, ax = plt.subplots()
+        succ_prob_all = []
+        for q in [103, 127, 151, 167, 191]:
+            succ_prob = attack_succ_qrc_test(q, rep = args.rep)
+            ax.plot(succ_prob.keys(), succ_prob.values(), "^--", label = f"q = {q}")
+            succ_prob_all.append([[key, succ_prob[key]] for key in succ_prob])
+
+        np.save("./succ_prob_test.npy", succ_prob_all)
+
+        ax.set_xlabel("Number of redundant columns")
+        ax.set_ylabel("Success probability")
+        ax.legend()
+
+        fig.savefig("./fig/succ_prob_test.svg", bbox_inches = "tight")
 
 
 

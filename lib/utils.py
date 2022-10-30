@@ -3,10 +3,23 @@ from typing import Union
 import numpy as np
 from numpy.random import default_rng
 import galois
+import os, sys
 
 GF = galois.GF(2)
 
 # %%
+class HiddenPrints:
+    '''
+    suppress the printing in function calls
+    '''
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
+
 def wrap_seed(seed):
     '''
     Convert seed into a np.random.Generator

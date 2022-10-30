@@ -2,7 +2,7 @@ from typing import Union
 import numpy as np
 from numpy.random import default_rng
 import galois
-from .utils import solvesystem, wrap_seed
+from .utils import solvesystem, wrap_seed, rank
 import itertools
 
 GF = galois.GF(2)
@@ -10,7 +10,7 @@ GF = galois.GF(2)
 __all__ = [
     "random_main_part", "random_gram", "random_tableau",
     "add_row_redundancy", "add_col_redundancy", 
-    "Factorization", "QRCConstruction"
+    "Factorization", "QRCConstruction", "generate_QRC_instance"
 ]
 
 def random_main_part(n, g, s, seed = None):
@@ -342,3 +342,23 @@ def q_helper(N):
     # [7, 23, 31, 47, 71, 79, 103, 127, 151, 167, 191, 199, 223,  239, 263, 271, 311, 359, 367, 383, 431, 439, 463, 479, 487, 503,  599, 607, 631, 647, 719, 727, 743, 751, 823, 839, 863, 887, 911,  919, 967, 983, 991]
 
 
+def generate_QRC_instance(
+    q: int, 
+    rd_row: int = 0, 
+    rd_col: int = 0
+):
+    '''
+    Args:
+        q: size parameter for QRC
+        rd_row: number of redundant rows
+        rd_col: number of redundant columns
+    '''
+    QRC = QRCConstruction(q) # initialization
+    QRC.obfuscation(1000)
+    H_M = QRC.P_s
+    s = QRC.s
+    H_M, s = add_col_redundancy(H_M, s, rd_col)
+    H = add_row_redundancy(H_M, s, rd_row)
+    print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
+
+    return H, s
