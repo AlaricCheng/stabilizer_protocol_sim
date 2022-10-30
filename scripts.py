@@ -124,14 +124,14 @@ def sol_size_qrc(q):
     return dim_sol
 
 
-def attack_succ_qrc(q, thres = 15, rep = 20, lim = 30):
+def attack_succ_qrc(q, thres = 15, rep = 100, lim = 40):
     '''
     Args
         lim: 
     '''
-    start_pt = int((q+1)/2) - 15
+    start_pt, end_pt = int((q+1)/2 - lim/2), int((q+1)/2 + lim)
     succ_prob = {}
-    for rd_col in trange(start_pt, start_pt+lim, 3):
+    for rd_col in trange(start_pt, end_pt, 4):
         with HiddenPrints():
             H, s = generate_QRC_instance(q, q, rd_col)
         # print("Secret:", s)
@@ -167,9 +167,13 @@ def draw_fig(idx):
         fig.savefig("./fig/sol_size.svg", bbox_inches = "tight")
     elif idx == 2:
         fig, ax = plt.subplots()
+        succ_prob_all = []
         for q in [103, 127, 151, 167, 191]:
             succ_prob = attack_succ_qrc(q, thres = args.thres, rep = args.rep)
-            ax.plot(succ_prob.keys(), succ_prob.values(), "^", label = f"q = {q}")
+            ax.plot(succ_prob.keys(), succ_prob.values(), "^--", label = f"q = {q}")
+            succ_prob_all.append([[key, succ_prob[key]] for key in succ_prob])
+
+        np.save("./tmp.npy", succ_prob_all)
 
         ax.set_xlabel("Number of redundant columns")
         ax.set_ylabel("Success probability")
