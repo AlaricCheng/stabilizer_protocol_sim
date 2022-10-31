@@ -9,6 +9,7 @@ from lib.construction import generate_QRC_instance
 import matplotlib.pyplot as plt
 from time import perf_counter
 from tqdm import tqdm, trange
+from lib.parallel import *
 
 GF = galois.GF(2)
 
@@ -122,7 +123,7 @@ def attack_succ_qrc_secret(q, thres = 15, rep = 100, lim = 40):
     return succ_prob
 
 
-def attack_succ_qrc_test(q, rep = 100, lim = 40):
+def attack_succ_qrc_test(q, rep = 100, lim = 40) -> dict:
     '''
     Probability that the prover's samples pass the verifier's test
     Args
@@ -135,19 +136,72 @@ def attack_succ_qrc_test(q, rep = 100, lim = 40):
             H, s = generate_QRC_instance(q, q, rd_col)
         # print("Secret:", s)
         count = 0
+        bad_d = 0
         for _ in range(rep):
             KMA = lib.KMAttack(H)
-            while KMA.check_d(s) is False:
+            while KMA.check_d(s) == False:
                 KMA.regenerate_d()
             M = KMA.get_M(1000)
+            if M is None:
+                bad_d += 1
+                continue
+            if rank(M) == M.shape[1]:
+                bad_d += 1
+                continue
             S = solvesystem(M)
             cand_s = GF.Random((1, len(S))) @ S
-            X = KMA.classical_sampling(cand_s, 10000)
+            X = KMA.classical_sampling(cand_s, 5000)
             if lib.hypothesis_test(s, X, 0.854):
                 count += 1
-        succ_prob[rd_col] = count/rep
+        succ_prob[rd_col] = count/(rep - bad_d)
 
     return succ_prob
+
+
+def attack_succ_qrc_no_redundant(q, check = True):
+    '''
+    Probability that the prover's samples pass the verifier's test (original QRC construction)
+    Args
+        check (bool): whether to check weights of the resulting code
+    '''
+    with HiddenPrints():
+        H, s = generate_QRC_instance(q, q, 0)
+    count = 0
+    bad_d = 0
+    for _ in trange(args.rep):
+        KMA = lib.KMAttack(H)
+        while KMA.check_d(s) == False:
+            KMA.regenerate_d()
+        M = KMA.get_M(1000)
+        if M is None:
+            bad_d += 1
+            continue
+        if rank(M) == M.shape[1]:
+            bad_d += 1
+            continue
+        if check:
+            S = solvesystem(M, all_sol = True)
+            cand_s = KMA.print_candidate_secret(S)
+        else:
+            S = solvesystem(M)
+            cand_s = GF.Random((1, len(S))) @ S
+        X = KMA.classical_sampling(cand_s, 5000)
+        if lib.hypothesis_test(s, X, 0.854):
+            count += 1
+    return count/(args.rep - bad_d)
+
+
+def merge_dict(dicts: list[dict]) -> list:
+    '''
+    dicts contains dictionaries with the same keys. Merge the values into a list.
+    '''
+    merged_dict = {}
+    for key in dicts[0]:
+        merged_dict[key] = [ele[key] for ele in dicts]
+    
+    merged_list = [[key] + value for key, value in zip(merged_dict.keys(), merged_dict.values())]
+
+    return np.array(merged_list)
 
 
 def draw_fig(idx):
@@ -178,12 +232,19 @@ def draw_fig(idx):
 
         fig.savefig("./fig/succ_prob_secret.svg", bbox_inches = "tight")
     elif idx == 3:
+        def helper(q):
+            return attack_succ_qrc_test(q, rep = args.rep)
+
         fig, ax = plt.subplots()
         succ_prob_all = []
         for q in [103, 127, 151, 167, 191]:
-            succ_prob = attack_succ_qrc_test(q, rep = args.rep)
-            ax.plot(succ_prob.keys(), succ_prob.values(), "^--", label = f"q = {q}")
-            succ_prob_all.append([[key, succ_prob[key]] for key in succ_prob])
+            succ_prob_tmp = tpmap(Task(helper), [q]*20, desc = f"q = {q}")
+            succ_prob = merge_dict(succ_prob_tmp)
+            ax.errorbar(succ_prob[:, 0], np.mean(succ_prob[:, 1:], axis = 1), yerr=np.std(succ_prob[:, 1:], axis = 1), marker = "^", label = f"q = {q}")
+
+            ref_pt = np.mean([attack_succ_qrc_no_redundant(q, False) for _ in range(20)])
+            ax.plot(succ_prob[:, 0], [ref_pt]*len(succ_prob), linestyle = "--", color = "lightcoral")
+            succ_prob_all.append(succ_prob)
 
         np.save("./succ_prob_test.npy", succ_prob_all)
 
@@ -199,6 +260,7 @@ def draw_fig(idx):
 # %%
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--n-proc", type = int, default = 3, help = "number of processors used")
     group = parser.add_mutually_exclusive_group()
 
     # QRC
@@ -230,7 +292,11 @@ if __name__ == "__main__":
     group_fig.add_argument("--thres", type = int, default = 15, help = "Threshold of solution space dimension")
     group_fig.add_argument("--rep", type = int, default=20, help = "Number of repetitions for attacking each instance")
 
+    parser.add_argument("--test", action = "store_true", help = "for test")
+
     args = parser.parse_args()
+
+    global_settings(processes = args.n_proc)
     
     # generate H and s
     if args.QRC == True:
@@ -249,6 +315,17 @@ if __name__ == "__main__":
     # figure
     if args.fig:
         draw_fig(args.fig)
+
+    if args.test:
+        def f_test(q):
+            return attack_succ_qrc_no_redundant(q, True)
+        # a = tpmap(f_test, [7]*10)
+        # a = attack_succ_qrc_no_redundant(31, False)
+        a = {1:0, 2: 2}
+        b = {1:2, 2: 3}
+        c = {1:1, 2: 4}
+        print(merge_dict([a,b,c]))
+        # print(list(zip([7]*10, [False]*10)))
     
 
 

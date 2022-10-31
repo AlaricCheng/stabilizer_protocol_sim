@@ -100,6 +100,8 @@ def add_col_redundancy(H_M, s, size, seed = None):
     Return:
         Tuple(H_M, s)
     '''
+    if size == 0:
+        return H_M, s
     ext_col = []
     n = H_M.shape[1]
     rng = wrap_seed(seed)
