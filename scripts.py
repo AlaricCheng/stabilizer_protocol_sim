@@ -102,12 +102,12 @@ def attack_succ_qrc_secret(q, thres = 15, rep = 100, lim = 40):
     '''
     start_pt, end_pt = int((q+1)/2 - lim/2), int((q+1)/2 + lim)
     succ_prob = {}
-    for rd_col in trange(start_pt, end_pt, 4):
+    for rd_col in range(start_pt, end_pt, 4):
         with HiddenPrints():
             H, s = generate_QRC_instance(q, q, rd_col)
         # print("Secret:", s)
         count = 0
-        for _ in range(rep):
+        for _ in trange(rep, desc = f"q = {q}, {rd_col} redundant columns"):
             KMA = lib.KMAttack(H)
             M = KMA.get_M(1000)
             S = solvesystem(M)
@@ -217,12 +217,16 @@ def draw_fig(idx):
 
         fig.savefig("./fig/sol_size.svg", bbox_inches = "tight")
     elif idx == 2:
+        def helper(q):
+            return attack_succ_qrc_secret(q, thres = args.thres, rep = args.rep)
+
         fig, ax = plt.subplots()
         succ_prob_all = []
         for q in [103, 127, 151, 167, 191]:
-            succ_prob = attack_succ_qrc_secret(q, thres = args.thres, rep = args.rep)
-            ax.plot(succ_prob.keys(), succ_prob.values(), "^--", label = f"q = {q}")
-            succ_prob_all.append([[key, succ_prob[key]] for key in succ_prob])
+            succ_prob_tmp = tpmap(Task(helper), [q]*20, desc = f"q = {q}")
+            succ_prob = merge_dict(succ_prob_tmp)
+            ax.errorbar(succ_prob[:, 0], np.mean(succ_prob[:, 1:], axis = 1), yerr=np.std(succ_prob[:, 1:], axis = 1), marker = "^", label = f"q = {q}")
+            succ_prob_all.append(succ_prob)
 
         np.save("./succ_prob_secret.npy", succ_prob_all)
 
@@ -290,7 +294,7 @@ if __name__ == "__main__":
     group_fig = parser.add_argument_group()
     group_fig.add_argument("--fig", type = int, help = "draw figure")
     group_fig.add_argument("--thres", type = int, default = 15, help = "Threshold of solution space dimension")
-    group_fig.add_argument("--rep", type = int, default=20, help = "Number of repetitions for attacking each instance")
+    group_fig.add_argument("--rep", type = int, default=100, help = "Number of repetitions for attacking each instance")
 
     parser.add_argument("--test", action = "store_true", help = "for test")
 
