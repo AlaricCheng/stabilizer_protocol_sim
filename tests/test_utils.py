@@ -1,6 +1,7 @@
 # import pytest
 import numpy as np
 from numpy.random import default_rng
+import lib
 from lib.utils import wrap_seed, solvesystem
 import galois
 
@@ -24,3 +25,18 @@ def test_solvesystem():
     sol = solvesystem(A, b, all_sol=True)
     for s in sol:
         assert np.all(A @ s.reshape(-1, 1) == b.reshape(-1, 1))
+
+def test_KF_partition():
+    A = GF.Random((6, 3))
+    print(A)
+    K, F = lib.utils.KF_partition(A)
+    assert np.all(GF.Ones((1, len(K))) @ K == 0)
+
+def test_lempel_sequence():
+    A = GF.Random((6, 3))
+    print(A)
+    G = A.T @ A
+    seq = lib.utils.lempel_sequence(A)
+    for E in seq:
+        assert np.all(E.T @ E == G)
+

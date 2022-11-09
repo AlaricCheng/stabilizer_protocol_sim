@@ -98,3 +98,64 @@ def rank(A):
     '''
     return np.sum(~np.all(A.row_reduce() == 0, axis=1))
 
+def remove_all_zero_rows(A: galois.GF(2)):
+    '''
+    remove the all-zero rows from A
+    '''
+    bool_idx = np.any(A != 0, axis = 1)
+    return A[bool_idx]
+
+def KF_partition(A: galois.GF(2)):
+    '''
+    Given a matrix A, reorder it into (K \\ F) s.t. K.1 = 0
+    '''
+    A = remove_all_zero_rows(A)
+    ind_row = A[0:1]
+    for row in A[1:]:
+        tmp = np.append(ind_row, row.reshape(1, -1), axis = 0)
+        if len(tmp.row_space()) == len(ind_row):
+            x = solvesystem(ind_row.T, row)[0]
+            y = GF.Zeros(len(A) - len(x))
+            y[0] = 1
+            x = np.append(x, y)
+            break
+        ind_row = tmp
+    K = A[x == 1]
+    F = A[x == 0]
+
+    return K, F
+
+def lempel_sequence(E: galois.GF(2)):
+    '''
+    Find the Lempel sequence
+    '''
+    n = E.shape[1]
+    seq = []
+    for _ in range(len(E)):
+        E = remove_all_zero_rows(E)
+        seq.append(E)
+        if len(E.row_space()) == len(E): # if all rows in E are independent
+            return seq
+        elif len(E) == 3:
+            K, F = KF_partition(E)
+            if len(F) == 1:
+                E = F
+                continue
+            elif len(F) == 0:
+                return seq
+        
+        K, F = KF_partition(E)
+        if len(K) == 2:
+            E = F
+            continue
+        elif len(K) % 2 == 0:
+            Z = K
+        else:
+            Z = np.vstack((K, GF.Zeros((1, n))))
+        if len(F) == 0:
+            F = GF.Zeros((1, n))
+        x = (F[0] + Z[0]).reshape(1, -1)
+        Z_tilde = Z + GF.Ones((len(Z), 1)) @ x
+        E = np.vstack((Z_tilde[1:], F[1:]))
+
+

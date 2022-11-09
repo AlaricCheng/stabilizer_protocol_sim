@@ -2,7 +2,7 @@ from typing import Union
 import numpy as np
 from numpy.random import default_rng
 import galois
-from .utils import solvesystem, wrap_seed, rank
+from .utils import solvesystem, wrap_seed, rank, lempel_sequence
 import itertools
 
 GF = galois.GF(2)
@@ -125,8 +125,8 @@ def add_col_redundancy(H_M, s, size, seed = None):
 class Factorization:
     def __init__(
         self, 
-        tab: 'galois.FieldArray', 
-        s: Union['galois.FieldArray', None] = None
+        tab: 'galois.GF(2)', 
+        s: Union['galois.GF(2)', None] = None
     ):
         '''
         Given a stabilizer tableau, return a factorization of the Gram matrix satisfying the weight and codeword constraints.
@@ -140,11 +140,12 @@ class Factorization:
         if s is None:
             s = self.self_consistent_eqn(one_sol=True) 
         self.s = s
+        self.H_obf = None
 
     def set_rng(self, seed):
         self.rng = wrap_seed(seed)
 
-    def get_weight(self): # TODO
+    def get_weight(self): 
         '''
         Get weight constraint from the stabilizer tableau.
         '''
@@ -158,7 +159,7 @@ class Factorization:
 
     def forward_evolution(self, row):
         '''
-        Evolve the stabilizer tableau after applying e^{i pi X_p /4}
+        Evolve the stabilizer tableau after applying e^{i pi X_p /4}. Internal use only.
         '''
         indices = row.nonzero()[0]
         for idx in indices: # update phase
@@ -166,11 +167,12 @@ class Factorization:
                 self.tab[idx, 2*self.n] += GF(1)
         for idx in itertools.product(indices, repeat = 2): # update gram matrix
             self.tab[idx] += GF(1)
-        self.__init__(self.tab, self.s)
+        self.G = self.tab[:, :self.n]
+        # self.__init__(self.tab, self.s)
 
     def backward_evolution(self, row):
         '''
-        Evolve the stabilizer tableau after applying e^{-i pi X_p /4}
+        Evolve the stabilizer tableau after applying e^{-i pi X_p /4}. Internal use only.
         '''
         indices = row.nonzero()[0]
         for idx in indices: # update phase
@@ -178,18 +180,24 @@ class Factorization:
                 self.tab[idx, 2*self.n] += GF(1)
         for idx in itertools.product(indices, repeat = 2): # update gram matrix
             self.tab[idx] += GF(1)
-        self.__init__(self.tab, self.s)
+        self.G = self.tab[:, :self.n]
+        # self.__init__(self.tab, self.s)
 
     def obfuscation(self, n_rows):
         '''
         Obfuscation of stabilizer tableau
         '''
+        if n_rows == 0:
+            return 
         H_obf = random_main_part(self.n, n_rows, self.s, seed = self.rng)
         for row in H_obf:
             self.backward_evolution(row)
-        return H_obf
+        if self.H_obf is None:
+            self.H_obf = H_obf
+        else:
+            self.H_obf = np.vstack((self.H_obf, H_obf))
 
-    def init_factor(self):
+    def init_factor(self, idx = None):
         '''
         Construct the initial factorization, based on [Lempel 75]. 
         '''
@@ -206,7 +214,10 @@ class Factorization:
                     tmp = GF.Zeros((1, self.n))
                     tmp[0, [i, j]] = 1, 1
                     E = np.append(E, tmp, axis = 0)
-        return E
+        lempel_seq = lempel_sequence(E)
+        if idx is None:
+            idx = self.rng.choice(len(lempel_seq))
+        return lempel_seq[idx]
 
     def satisfy_weight_constraint(self, E):
         '''
@@ -214,12 +225,13 @@ class Factorization:
         '''
         weights = np.sum(E.view(np.ndarray), axis = 0) % 4 # weights of columns of E mod 4
         weight_diff = (self.get_weight() - weights) % 4
-        for idx, w in enumerate(weight_diff):
-            if w == 0:
-                continue
-            rows = GF.Zeros((w, self.n))
-            rows[:, idx] = GF.Ones(w)
-            E = np.append(E, rows, axis = 0)
+        if np.all(weight_diff == 0) == True:
+            return E
+        rows = GF.Zeros((2, self.n))
+        for i in range(self.n):
+            if weight_diff[i] != 0:
+                rows[:, i] = GF.Ones(2)
+        E = np.append(E, rows, axis = 0)
         return E
     
     def self_consistent_eqn(self, one_sol = False):
@@ -252,23 +264,23 @@ class Factorization:
         Z = Z + ones @ x.reshape(1, -1)
         return np.append(F, Z, axis = 0)
 
-    def final_factor(self, obf_rows = None):
+    def final_factor(self, idx = None, obf_rows = None):
         '''
         Combine the subroutines to generate the final factorization.
         Args
             obf_rows: for stabilizer tableau obfuscation
         '''
         if obf_rows is None:
-            obf_rows = self.n
-        H_obf = self.obfuscation(obf_rows)
-        E_init = self.init_factor()
+            obf_rows = 0
+        self.obfuscation(obf_rows)
+        E_init = self.init_factor(idx)
         E = self.satisfy_weight_constraint(E_init)
         H = self.injecting_ones(E)
         H = self.satisfy_weight_constraint(H)
-        if obf_rows == 0:
+        if self.H_obf is None:
             return H
         else:
-            return np.vstack((H_obf, H))
+            return np.vstack((self.H_obf, H))
 
 
 class QRCConstruction:
