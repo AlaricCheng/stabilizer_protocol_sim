@@ -4,10 +4,20 @@ import numpy as np
 from numpy.random import default_rng
 import galois
 import os, sys
+import re
 
 GF = galois.GF(2)
 
 # %%
+def load_data(fname):
+    H = np.loadtxt(fname, dtype=int).view(GF)
+    with open(fname, "r") as f:
+        for line in f:
+            if line[0] == "#" and "s" in line:
+                s = GF([int(c) for c in re.findall(r"\d+", line)])
+                return H, s
+    return H
+
 class HiddenPrints:
     '''
     suppress the printing in function calls

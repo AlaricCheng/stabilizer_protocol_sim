@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 import numpy as np
 from numpy.random import default_rng
 import galois
@@ -126,7 +126,8 @@ class Factorization:
     def __init__(
         self, 
         tab: 'galois.GF(2)', 
-        s: Union['galois.GF(2)', None] = None
+        s: Optional['galois.GF(2)'] = None,
+        random_state: Optional[Union[int, np.random.Generator]] = None
     ):
         '''
         Given a stabilizer tableau, return a factorization of the Gram matrix satisfying the weight and codeword constraints.
@@ -136,14 +137,11 @@ class Factorization:
         G = tab[:, :self.n]
         assert np.all(G == G.T), "G must be symmetric"
         self.G = G 
-        self.rng = default_rng()
+        self.rng = wrap_seed(random_state)
         if s is None:
             s = self.self_consistent_eqn(one_sol=True) 
         self.s = s
         self.H_obf = None
-
-    def set_rng(self, seed):
-        self.rng = wrap_seed(seed)
 
     def get_weight(self): 
         '''
@@ -288,9 +286,9 @@ class QRCConstruction:
         # a valid q can be obtained from lib.construction.q_helper
         assert (q+1)%8 == 0, "(q + 1) must divide 8"
         self.q = q # size parameter
-        self.n = int((q+3)/2) # num of qubits
-        self.s = np.append([1], GF.Zeros(self.n - 1)) # initial secret
+        self.n = int((q+1)/2) # num of qubits
         self.P_s = self.init_main() # initial main part
+        self.s, _ = solvesystem(self.P_s, GF.Ones(q)) # initial secret
 
     def quad_res(self):
         '''
@@ -307,11 +305,10 @@ class QRCConstruction:
         Generate initial main part
         '''
         P_s = GF.Zeros((self.q, self.n))
-        P_s[:, 0] = 1
         QRs = self.quad_res() # the list of quadratic residues
-        for col in range(self.n-1):
+        for col in range(self.n):
             for qr in QRs:
-                P_s[(qr - 1 + col)%self.q, col+1] = 1
+                P_s[(qr - 1 + col)%self.q, col] = 1
         return P_s
 
     def ColAdd(self, i, j):
@@ -359,13 +356,15 @@ def q_helper(N):
 def generate_QRC_instance(
     q: int, 
     rd_row: int = 0, 
-    rd_col: int = 0
+    rd_col: int = 0,
+    verbose: bool = False
 ):
     '''
     Args:
         q: size parameter for QRC
         rd_row: number of redundant rows
         rd_col: number of redundant columns
+        verbose: whether to print the info
     '''
     QRC = QRCConstruction(q) # initialization
     QRC.obfuscation(1000)
@@ -373,6 +372,7 @@ def generate_QRC_instance(
     s = QRC.s
     H_M, s = add_col_redundancy(H_M, s, rd_col)
     H = add_row_redundancy(H_M, s, rd_row)
-    print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
+    if verbose:
+        print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
 
     return H, s
