@@ -3,6 +3,7 @@ import galois, lib
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+import json
 from lib.construction import q_helper
 from lib.parallel import *
 
@@ -16,7 +17,7 @@ def get_qrc_size_list(q):
 
 
 def attack_qrc_original(q, thres = 15, lim = 40):
-    start_pt, end_pt = int((q+1)/2 - lim/2), int((q+1)/2 + lim/2)
+    start_pt, end_pt = int((q+1)/2 - lim/2), int((q+1)/2 + lim)
     
     data = {}
     for rd_col in range(start_pt, end_pt+1, 2):
@@ -39,7 +40,7 @@ def merge_dict(dicts: list[dict]) -> list:
     '''
     merged_dict = {}
     for key in dicts[0]:
-        merged_dict[key] = [ele[key] for ele in dicts]
+        merged_dict[int(key)] = [ele[key] for ele in dicts]
 
     count_dict = {}
     for key in merged_dict:
@@ -66,18 +67,22 @@ if __name__ == "__main__":
     global_settings(processes = args.n_proc)
     q_list = args.q
 
-    fig, ax = plt.subplots(ncols=2, figsize = (8, 4), constrained_layout = True)
     for q in q_list:
-        tmp = tpmap(Task(helper_original), [q]*args.rep, desc = f"q = {q}")
-        counts, succ_prob = merge_dict(tmp)
-        ax[0].errorbar(counts[:, 0], np.mean(counts[:, 1:], axis = 1), yerr=np.std(counts[:, 1:], axis = 1), fmt = "^--", label = f"q = {q}")
-        ax[1].plot(succ_prob.keys(), succ_prob.values(), "^--", label = f"q = {q}")
+        fig, ax = plt.subplots(ncols=2, figsize = (8, 4), constrained_layout = True)
+        data = tpmap(Task(helper_original), [q]*args.rep, desc = f"q = {q}")
+        counts, succ_prob = merge_dict(data)
 
-    ax[0].set_xlabel("Degree of column redundancy")
-    ax[0].set_ylabel("Number of checked solutions")
+        with open(f"./data/original_attack_{q}.json", "w") as f:
+            json.dump(data, f)
 
-    ax[1].set_xlabel("Degree of column redundancy")
-    ax[1].set_ylabel("Success probability")
-    ax[1].legend()
+        ax[0].errorbar(counts[:, 0], np.mean(counts[:, 1:], axis = 1), yerr=np.std(counts[:, 1:], axis = 1), fmt = "^--", color = "royalblue", label = f"q = {q}")
+        ax[1].plot(succ_prob.keys(), succ_prob.values(), "^--", color = "royalblue", label = f"q = {q}")
 
-    fig.savefig(f"./fig/original_attack_{q_list}.svg")
+        ax[0].set_xlabel("Degree of column redundancy")
+        ax[0].set_ylabel("Number of checked solutions")
+
+        ax[1].set_xlabel("Degree of column redundancy")
+        ax[1].set_ylabel("Success probability")
+        ax[1].legend()
+
+        fig.savefig(f"./fig/original_attack_{q}.svg")
