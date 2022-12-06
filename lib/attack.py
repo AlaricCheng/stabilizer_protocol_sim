@@ -131,23 +131,27 @@ class QRCAttack(LinearityAttack):
                 y = int2bin(i, len(ker_M))
                 s = y.reshape(1, -1) @ ker_M
                 if self.check_weight(s):
-                    return s
+                    return s, count
                 count += 1
                 if budget is not None and count >= budget:
-                    return s
-        return s
+                    return s, count
+        return s, count
 
     def classical_sampling_original(
         self, 
         n_samples: int, 
         budget: Optional[int] = None,
-        verbose: bool = False
+        verbose: bool = False,
+        require_count: bool = False
     ):
         '''
         Generate the samples to pass the verifier's test
         '''
-        s = self.extract_secret_original(10*self.P.shape[0], budget=budget)
-        return classical_samp_same_bias(s, 0.854, n_samples, verbose = verbose)
+        s, count = self.extract_secret_original(10*self.P.shape[0], budget=budget)
+        if require_count:
+            return classical_samp_same_bias(s, 0.854, n_samples, verbose = verbose), count
+        else:
+            return classical_samp_same_bias(s, 0.854, n_samples, verbose = verbose)
 
     def extract_secret_enhanced(
         self,
