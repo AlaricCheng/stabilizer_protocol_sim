@@ -55,7 +55,7 @@ class TestFactorization:
         s = GF.Random(n)
         tab = random_tableau(n, g, s)
         fac = Factorization(tab.copy(), s)
-        H = fac.final_factor()
+        H = fac.final_factor(rand_rows=10)
         assert np.all(tab[:, :n] == H.T @ H)
         assert np.all(H @ s.reshape(-1, 1) == 1)
 
@@ -65,4 +65,16 @@ class TestFactorization:
         assert np.all(fac1.G == 0)
         assert np.all(fac1.tab[:, 2*n] == 0)
 
+
+def test_generate_QRC_instance():
+    H, s = generate_QRC_instance(7, 7, 5)
+    H_M = H[(H @ s == 1)]
+    assert rank(H_M.T @ H_M) == 1
+
+
+def test_generate_stab_instance():
+    H, s = generate_stab_instance(7, 3, rd_col = 5)
+    assert H.shape[1] == 12
+    H_M = H[(H @ s == 1)]
+    assert rank(H_M.T @ H_M) <= 3
     

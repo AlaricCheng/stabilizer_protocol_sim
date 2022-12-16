@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 import numpy as np
 from numpy.random import default_rng
 import galois
@@ -9,8 +9,8 @@ GF = galois.GF(2)
 
 __all__ = [
     "random_main_part", "random_gram", "random_tableau",
-    "add_row_redundancy", "add_col_redundancy", 
-    "Factorization", "QRCConstruction", "generate_QRC_instance"
+    "add_row_redundancy", "add_col_redundancy", "Factorization", 
+    "QRCConstruction", "generate_QRC_instance", "generate_stab_instance"
 ]
 
 def random_main_part(n, g, s, seed = None):
@@ -33,6 +33,7 @@ def random_main_part(n, g, s, seed = None):
         if np.dot(row, s) == 1:
             H.append(row)
     H = GF(H)
+
     return H
 
 def random_gram(n, g, s, seed = None):
@@ -49,6 +50,7 @@ def random_gram(n, g, s, seed = None):
     rng = wrap_seed(seed)
     H = random_main_part(n, g, s, seed = rng)
     G = H.T @ H
+
     return G
 
 def random_tableau(n, g, s, seed = None):
@@ -67,6 +69,7 @@ def random_tableau(n, g, s, seed = None):
     x = GF.Random((n, 1), seed = rng)
     r = G @ x # to ensure that the overlap is not zero.
     stab_tab = np.hstack((G, GF.Identity(n), r))
+
     return stab_tab
 
 def add_row_redundancy(H, s, size, seed = None):
@@ -87,6 +90,7 @@ def add_row_redundancy(H, s, size, seed = None):
         row = GF.Random(n, seed = rng)
         if np.dot(row, s) == 0 and np.any(row != 0): # exclude all-zero rows
             H_R.append(row)
+
     return np.append(H, H_R, axis = 0)
 
 def add_col_redundancy(H_M, s, size, seed = None):
@@ -119,7 +123,48 @@ def add_col_redundancy(H_M, s, size, seed = None):
 
     new_H_M = np.hstack((H_M, ext_col)) # append random cols to the right of H_M
     new_s = np.append(s, s_prime)
+
     return new_H_M, new_s
+
+def col_add(
+    P: 'galois.FieldArray', 
+    s: 'galois.FieldArray', 
+    i: int, 
+    j: int
+) -> Tuple['galois.FieldArray', 'galois.FieldArray']:
+    '''
+    Add the j-th column of P to the i-th column, and add the i-th element of s to the j-th element.
+    Args:
+        P (galois.FieldArray): binary matrix
+        s (galois.FieldArray): secret vector
+        i (int): index of the first column
+        j (int): index of the second column
+    Return:
+        Tuple(new_P, new_s)
+    '''
+    s_i = s[i]
+    s_j = s[j]
+    s_j = s_i + s_j
+    s[j] = s_j
+
+    P_i = P[:, i]
+    P_j = P[:, j]
+    P_i = P_i + P_j
+    P[:, i] = P_i
+
+    return P, s
+
+def obfuscation(P, s, times, seed = None):
+    '''
+    Perform column operations on P and s.
+    '''
+    rng = wrap_seed(seed)
+    n = P.shape[1]
+    for _ in range(times):
+        i, j = rng.choice(n, size = 2, replace = False)
+        P, s = col_add(P, s, i, j)
+
+    return P, s
 
 
 class Factorization:
@@ -141,7 +186,7 @@ class Factorization:
         if s is None:
             s = self.self_consistent_eqn(one_sol=True) 
         self.s = s
-        self.H_obf = None
+        self.H_rand = None
 
     def get_weight(self): 
         '''
@@ -181,19 +226,19 @@ class Factorization:
         self.G = self.tab[:, :self.n]
         # self.__init__(self.tab, self.s)
 
-    def obfuscation(self, n_rows):
+    def randomization(self, n_rows):
         '''
-        Obfuscation of stabilizer tableau
+        Randomization of stabilizer tableau
         '''
         if n_rows == 0:
             return 
-        H_obf = random_main_part(self.n, n_rows, self.s, seed = self.rng)
-        for row in H_obf:
+        H_rand = random_main_part(self.n, n_rows, self.s, seed = self.rng)
+        for row in H_rand:
             self.backward_evolution(row)
-        if self.H_obf is None:
-            self.H_obf = H_obf
+        if self.H_rand is None:
+            self.H_rand = H_rand
         else:
-            self.H_obf = np.vstack((self.H_obf, H_obf))
+            self.H_rand = np.vstack((self.H_rand, H_rand))
 
     def init_factor(self, idx = None):
         '''
@@ -262,23 +307,22 @@ class Factorization:
         Z = Z + ones @ x.reshape(1, -1)
         return np.append(F, Z, axis = 0)
 
-    def final_factor(self, idx = None, obf_rows = None):
+    def final_factor(self, idx = None, rand_rows = 0):
         '''
         Combine the subroutines to generate the final factorization.
-        Args
-            obf_rows: for stabilizer tableau obfuscation
+        Args:
+            idx: index of the lempel sequence
+            rand_rows: for stabilizer tableau randomization
         '''
-        if obf_rows is None:
-            obf_rows = 0
-        self.obfuscation(obf_rows)
+        self.randomization(rand_rows)
         E_init = self.init_factor(idx)
         E = self.satisfy_weight_constraint(E_init)
         H = self.injecting_ones(E)
         H = self.satisfy_weight_constraint(H)
-        if self.H_obf is None:
+        if self.H_rand is None:
             return H
         else:
-            return np.vstack((self.H_obf, H))
+            return np.vstack((self.H_rand, H))
 
 
 class QRCConstruction:
@@ -311,28 +355,6 @@ class QRCConstruction:
                 P_s[(qr - 1 + col)%self.q, col] = 1
         return P_s
 
-    def ColAdd(self, i, j):
-        '''
-        Add the j-th column of P_s to the i-th column, and add the i-th element of s to the j-th element.
-        '''
-        s_i = self.s[i]
-        s_j = self.s[j]
-        s_j = s_i + s_j
-        self.s[j] = s_j
-
-        P_i = self.P_s[:, i]
-        P_j = self.P_s[:, j]
-        P_i = P_i + P_j
-        self.P_s[:, i] = P_i
-
-    def obfuscation(self, times, seed = None):
-        '''
-        Do column operations on P_s and s.
-        '''
-        rng = wrap_seed(seed)
-        for _ in range(times):
-            i, j = rng.choice(self.n, size = 2, replace = False)
-            self.ColAdd(i, j)
 
 def is_prime(n):
     if n % 2 == 0 and n > 2: 
@@ -367,11 +389,41 @@ def generate_QRC_instance(
         verbose: whether to print the info
     '''
     QRC = QRCConstruction(q) # initialization
-    QRC.obfuscation(1000)
     H_M = QRC.P_s
     s = QRC.s
     H_M, s = add_col_redundancy(H_M, s, rd_col)
     H = add_row_redundancy(H_M, s, rd_row)
+    H, s = obfuscation(H, s, 1000)
+    if verbose:
+        print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
+
+    return H, s
+
+
+def generate_stab_instance(
+    n_init: int,
+    g: int,
+    rd_row: int = None,
+    rd_col: int = 0,
+    verbose: bool = False
+):
+    '''
+    Args:
+        n_init: initial number of qubits
+        g: the rank of the Gram matrix
+        rd_row: number of redundant rows
+        rd_col: number of redundant columns
+        verbose: whether to print the info
+    '''
+    s = GF.Random(n_init)
+    tab = random_tableau(n_init, g, s)
+    stab_ins = Factorization(tab, s)
+    H_M = stab_ins.final_factor(rand_rows = int(n_init/5))
+    H_M, s = add_col_redundancy(H_M, s, rd_col)
+    if rd_row is None:
+        rd_row = H_M.shape[0]
+    H = add_row_redundancy(H_M, s, rd_row)
+    H, s = obfuscation(H, s, 1000)
     if verbose:
         print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
 

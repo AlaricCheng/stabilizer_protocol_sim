@@ -1,5 +1,5 @@
 # %%
-from typing import Union
+from typing import Union, Optional, List
 import numpy as np
 from numpy.random import default_rng
 import galois
@@ -9,12 +9,14 @@ import re
 GF = galois.GF(2)
 
 # %%
+bias = lambda g: (1+2**(-g/2))/2
+
 def load_data(fname):
     H = np.loadtxt(fname, dtype=int).view(GF)
     with open(fname, "r") as f:
         for line in f:
             if line[0] == "#" and "s" in line:
-                s = GF([int(c) for c in re.findall(r"\d+", line)])
+                s = GF([int(c) for c in re.findall(r"\d+", line)]) 
                 return H, s
     return H
 
@@ -30,7 +32,7 @@ class HiddenPrints:
         sys.stdout.close()
         sys.stdout = self._original_stdout
 
-def wrap_seed(seed):
+def wrap_seed(seed: Optional[Union[int, np.random.Generator]]):
     '''
     Convert seed into a np.random.Generator
     '''
@@ -135,7 +137,7 @@ def KF_partition(A: galois.GF(2)):
 
     return K, F
 
-def lempel_sequence(E: galois.GF(2)):
+def lempel_sequence(E: galois.GF(2)) -> List[galois.GF(2)]:
     '''
     Find the Lempel sequence
     '''

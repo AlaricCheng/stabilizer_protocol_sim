@@ -3,9 +3,22 @@ from typing import Optional, Union
 import numpy as np
 from numpy.random import default_rng
 import galois
-from lib.utils import solvesystem, rank, wrap_seed, int2bin
+from lib.utils import solvesystem, rank, wrap_seed, int2bin, bias
 
 GF = galois.GF(2)
+
+def find_independent_sets(S: 'galois.GF(2)') -> 'galois.GF(2)':
+    ''' return a random independent sets of S '''
+    b = np.zeros(len(S), dtype = bool)
+    idx = default_rng().choice(len(S), size = len(S), replace = False) # random permutation of S
+    for i in idx:
+        b[i] = 1
+        if len(S[b].row_space()) == len(S[b]):
+            S_ind = S[b]
+        else:
+            b[i] = 0
+
+    return S_ind
 
 class LinearityAttack:
     '''
@@ -73,19 +86,68 @@ class LinearityAttack:
             M.append(np.sum(P_de, axis = 0))
         return GF(M)
 
-    def print_candidate_secret(self, S, threshold = 5, print_rank = False):
+    def extract_secret(
+        self, 
+        l: int,
+        g_thres: int = 5,
+        budget: Optional[int] = 2**15
+    ):
         '''
-        Add a rank checking step.
+        The extract secret subroutine of the Linearity attack.
+        Args:
+            l (int): number of linear equations
+            g_thres (int): the threshold of the rank of G_s
+            budget (int): the maximum number of checking secrets
         '''
-        candidate = []
-        rank = []
+        count = 0
+        S = []
+        while count < budget:
+            self.regenerate_d()
+            M = self.get_M(l)
+            if M is None:
+                continue
+            ker_M = solvesystem(M)
+            if len(ker_M) == 0:
+                continue
+            for i in range(1, 2**(len(ker_M))):
+                y = int2bin(i, len(ker_M))
+                s = y.reshape(1, -1) @ ker_M
+                if self.get_Gs_rank(s) <= g_thres:
+                    S.append(s)
+                count += 1
+                if count >= budget and len(S) == 0:
+                    return s, s
+        S = np.unique(np.vstack(S), axis = 0).view(GF)
+        S_ind = find_independent_sets(S)
+
+        return S_ind, S
+
+    def classical_sampling(
+        self,
+        n_samples: int,
+        budget: Optional[int] = 2**15,
+        independent_candidate: bool = True,
+        g_thres: int = None,
+        verbose: bool = False
+    ):
+        '''
+        Generate the samples to pass the verifier's test
+        '''
+        if g_thres is None:
+            cor_func_list = np.array([2**(-g/2) for g in range(1, 6)])
+            g_thres = np.abs(cor_func_list - 2/np.sqrt(n_samples)).argmin() + 1
+        S_ind, S = self.extract_secret(10*self.P.shape[0], g_thres, budget = budget)
+        if independent_candidate:
+            S = S_ind
+        beta = []
         for s in S:
-            rank.append(self.get_Gs_rank(s))
-            if self.get_Gs_rank(s) <= threshold:
-                candidate.append(s)
-        if print_rank == True:
-            print(rank)
-        return GF(candidate)
+            g = self.get_Gs_rank(s)
+            beta.append(bias(g))
+        idx = sorted(range(len(beta)), key = lambda k: beta[k])
+        S_sorted = [S[k] for k in idx]
+        beta_sorted = [beta[k] for k in idx]
+        
+        return classical_samp_diff_bias(S_sorted, beta_sorted, n_samples, verbose)
 
 
 class QRCAttack(LinearityAttack):
@@ -127,7 +189,7 @@ class QRCAttack(LinearityAttack):
             ker_M = solvesystem(M)
             if len(ker_M) == 0:
                 continue
-            for i in range(2**(len(ker_M))):
+            for i in range(1, 2**(len(ker_M))):
                 y = int2bin(i, len(ker_M))
                 s = y.reshape(1, -1) @ ker_M
                 if self.check_weight(s):
@@ -175,7 +237,7 @@ class QRCAttack(LinearityAttack):
             ker_M = solvesystem(M)
             if len(ker_M) == 0:
                 continue
-            for i in range(2**(len(ker_M))):
+            for i in range(1, 2**(len(ker_M))):
                 y = int2bin(i, len(ker_M))
                 s = y.reshape(1, -1) @ ker_M
                 if self.check_weight(s):
@@ -195,7 +257,8 @@ class QRCAttack(LinearityAttack):
         Generate the samples to pass the verifier's test
         '''
         S = self.extract_secret_enhanced(10*self.P.shape[0], budget=budget)
-        return classical_samp_same_bias(S, 0.854, n_samples, verbose = verbose)
+        S_ind = find_independent_sets(S)
+        return classical_samp_same_bias(S_ind, 0.854, n_samples, verbose = verbose)
 
     def classical_sampling_kernel(self, M: galois.GF(2), n_samples: int):
         '''
@@ -238,7 +301,8 @@ def classical_samp_same_bias(
 def classical_samp_diff_bias(
     S: galois.GF(2), 
     beta: list, 
-    n_samples: int
+    n_samples: int,
+    verbose: bool = False
 ):
     '''
     Classical sampling for the case where the candidates all have the same associated bias. `beta` is in the ascending order.
@@ -247,6 +311,8 @@ def classical_samp_diff_bias(
     beta = np.array(beta)
     if len(S.shape) == 1:
         raise ValueError("There is only one candidate; use `classical_samp_same_bias` instead")
+    if verbose:
+        print("candidate secret:\n", S)
     beta_unique = np.unique(beta)
     prob = []
     for b1, b2 in zip(beta_unique, beta_unique[1:]):

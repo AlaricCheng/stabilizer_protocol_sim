@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.random import default_rng
 import galois
 
 GF = galois.GF(2)
@@ -12,6 +11,8 @@ def hypothesis_test(s, X, bias):
         X: the set of samples from the prover
         bias: the expected bias
     '''
+    if X is None:
+        return False
     tolarence = 2/np.sqrt(len(X))
     count = 0
     for x in X:
