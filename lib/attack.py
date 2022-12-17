@@ -115,12 +115,13 @@ class LinearityAttack:
                 if self.get_Gs_rank(s) <= g_thres:
                     S.append(s)
                 count += 1
-                if count >= budget and len(S) == 0:
-                    return s, s
+                if count >= budget:
+                    break
+        if len(S) == 0:
+            return s
         S = np.unique(np.vstack(S), axis = 0).view(GF)
-        S_ind = find_independent_sets(S)
 
-        return S_ind, S
+        return S
 
     def classical_sampling(
         self,
@@ -136,9 +137,9 @@ class LinearityAttack:
         if g_thres is None:
             cor_func_list = np.array([2**(-g/2) for g in range(1, 6)])
             g_thres = np.abs(cor_func_list - 2/np.sqrt(n_samples)).argmin() + 1
-        S_ind, S = self.extract_secret(10*self.P.shape[0], g_thres, budget = budget)
+        S = self.extract_secret(10*self.P.shape[0], g_thres, budget = budget)
         if independent_candidate:
-            S = S_ind
+            S = find_independent_sets(S)
         beta = []
         for s in S:
             g = self.get_Gs_rank(s)
@@ -243,22 +244,28 @@ class QRCAttack(LinearityAttack):
                 if self.check_weight(s):
                     S.append(s)
                 count += 1
-                if count >= budget and len(S) == 0:
-                    return s
-        return np.unique(np.vstack(S), axis = 0)
+                if count >= budget:
+                    break
+        if len(S) == 0:
+            return s, count
+        return np.unique(np.vstack(S), axis = 0).view(GF), count
 
     def classical_sampling_enhanced(
         self,
         n_samples: int, 
         budget: Optional[int] = 2**15,
-        verbose: bool = False
+        verbose: bool = False,
+        require_count: bool = False
     ):
         '''
         Generate the samples to pass the verifier's test
         '''
-        S = self.extract_secret_enhanced(10*self.P.shape[0], budget=budget)
+        S, count = self.extract_secret_enhanced(10*self.P.shape[0], budget=budget)
         S_ind = find_independent_sets(S)
-        return classical_samp_same_bias(S_ind, 0.854, n_samples, verbose = verbose)
+        if require_count:
+            return classical_samp_same_bias(S_ind, 0.854, n_samples, verbose = verbose), count
+        else:
+            return classical_samp_same_bias(S_ind, 0.854, n_samples, verbose = verbose)
 
     def classical_sampling_kernel(self, M: galois.GF(2), n_samples: int):
         '''
