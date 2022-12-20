@@ -109,7 +109,7 @@ def draw_fig_original(q_list):
         ax[0].set_ylabel("Number of checked solutions")
 
         ax[1].set_xlabel("Degree of column redundancy")
-        ax[1].set_ylabel("Success probability")
+        ax[1].set_ylabel("Fraction of hacked instances")
         ax[1].legend()
 
         fig.savefig(f"./fig/original_attack_{q}.svg")
@@ -126,11 +126,11 @@ def attack_qrc_enhanced(q, thres = 15, lim = 60) -> dict:
     start_pt, end_pt = int((q+1)/2), int((q+1)/2 + lim)
 
     data = {}
-    for rd_col in range(start_pt, end_pt+1, 2):
+    for rd_col in range(start_pt, end_pt+1):
         # print(rd_col)
         H, s = lib.generate_QRC_instance(q, q, rd_col)
-        X = lib.QRCAttack(H).classical_sampling_enhanced(5000, budget=2**thres)
-        data[rd_col] = (2**thres, lib.hypothesis_test(s, X, 0.854))
+        X, c = lib.QRCAttack(H).classical_sampling_enhanced(5000, budget=2**thres, require_count=True)
+        data[rd_col] = (c, lib.hypothesis_test(s, X, 0.854))
 
     return data
 
@@ -147,8 +147,11 @@ def helper_enhanced(q):
         }
     '''
     data = []
-    for i in range(5):
+    for i in range(3):
         data.append(attack_qrc_enhanced(q, thres = args.thres+i, lim = args.lim))
+
+    with open("tmp.log", "w") as f:
+        json.dump(merge_dict(data), f)
     
     return merge_dict(data)
 
@@ -197,16 +200,25 @@ def draw_fig_enhanced(q_list):
             succ_prob = {k: get_succ_prob(v) for k, v in data.items()}
         # succ_prob is of the form {rd_col: np.ndarray}, where each row of the np.ndarray is of the form [count, success probability]
 
-        for i in range(5):
+        for i in range(3):
             tmp = {}
             for k, v in succ_prob.items():
                 tmp[k] = v[(v[:, 0] == 2**(args.thres+i))][0, 1] # get the success probability for the corresponding budget
             ax.plot(tmp.keys(), tmp.values(), "^--", label = f"thres = {2**(args.thres+i)}")
         ax.set_xlabel("Degree of column redundancy")
-        ax.set_ylabel("Success probability")
+        ax.set_ylabel("Fraction of hacked instances")
         ax.legend()
 
         fig.savefig(f"./fig/enhanced_attack_{q}.svg")
+
+
+def test(q):
+    with open(f"./data/enhanced_attack_{q}.json", "r") as f:
+        data = json.load(f)
+        print(len(data))
+        data = merge_dict(data)
+        succ_prob = {k: get_succ_prob(v) for k, v in data.items()}
+    print(succ_prob)
 
 
 if __name__ == "__main__":
@@ -221,7 +233,7 @@ if __name__ == "__main__":
     parser.add_argument("--rep", type = int, default=30, help = "Number of repetitions for attacking each instance")
     parser.add_argument("--lim", type = int, default=60, help = "the range of column redundancy")
 
-    # parser.add_argument("--test", action = "store_true", help = "test the code (default: False)")
+    parser.add_argument("--test", action = "store_true", help = "test the code (default: False)")
     
     args = parser.parse_args()
     
@@ -239,5 +251,8 @@ if __name__ == "__main__":
             draw_fig_original(q_list)
         elif args.type == "enhanced":
             draw_fig_enhanced(q_list)
+
+    if args.test:
+        test(151)
 
 
