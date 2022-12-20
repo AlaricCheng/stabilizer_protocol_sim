@@ -99,7 +99,7 @@ def add_col_redundancy(H_M, s, size, seed = None):
     Args:
         H_M (galois.FieldArray): binary matrix to be appended redundant columns
         s (galois.FieldArray): secret vector
-        size (int): number of redundant rows
+        size (int): number of redundant columns
         seed (int | np.random.Generator): seed for random sampling
     Return:
         Tuple(H_M, s)
@@ -403,26 +403,26 @@ def generate_QRC_instance(
 def generate_stab_instance(
     n_init: int,
     g: int,
-    rd_row: int = None,
-    rd_col: int = 0,
+    rd_col_ext: int = 0,
     verbose: bool = False
 ):
     '''
+    Generate an instance of stabilizer construction, s.t. the number of rows in the main part and the redundant part are the same. 
     Args:
         n_init: initial number of qubits
         g: the rank of the Gram matrix
-        rd_row: number of redundant rows
-        rd_col: number of redundant columns
+        rd_col_ext: the value of n-m/2
         verbose: whether to print the info
     '''
     s = GF.Random(n_init)
     tab = random_tableau(n_init, g, s)
     stab_ins = Factorization(tab, s)
     H_M = stab_ins.final_factor(rand_rows = int(n_init/5))
+    rd_col = rd_col_ext + H_M.shape[0] - H_M.shape[1]
+    if rd_col < 0:
+        rd_col = 0
     H_M, s = add_col_redundancy(H_M, s, rd_col)
-    if rd_row is None:
-        rd_row = H_M.shape[0]
-    H = add_row_redundancy(H_M, s, rd_row)
+    H = add_row_redundancy(H_M, s, H_M.shape[0])
     H, s = obfuscation(H, s, 1000)
     if verbose:
         print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)

@@ -73,8 +73,8 @@ def test_generate_QRC_instance():
 
 
 def test_generate_stab_instance():
-    H, s = generate_stab_instance(7, 3, rd_col = 5)
-    assert H.shape[1] == 12
+    H, s = generate_stab_instance(7, 3, rd_col_ext = 5)
+    assert H.shape[1] - H.shape[0]/2 == 5
     H_M = H[(H @ s == 1)]
     assert rank(H_M.T @ H_M) <= 3
     
