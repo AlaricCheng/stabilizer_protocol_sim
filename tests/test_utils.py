@@ -40,3 +40,6 @@ def test_lempel_sequence():
     for E in seq:
         assert np.all(E.T @ E == G)
 
+    factor = lib.utils.lempel_sequence(A, n_rows = 6)
+    assert abs(factor.shape[0] - 6) <= 1
+

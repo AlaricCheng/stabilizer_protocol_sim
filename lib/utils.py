@@ -137,14 +137,19 @@ def KF_partition(A: galois.GF(2)):
 
     return K, F
 
-def lempel_sequence(E: galois.GF(2)) -> List[galois.GF(2)]:
+def lempel_sequence(E: galois.GF(2), n_rows = None) -> List[galois.GF(2)]:
     '''
-    Find the Lempel sequence
+    Find the Lempel sequence. If n_rows is not None, return the factor whose number of rows is closest to n_rows.
     '''
     n = E.shape[1]
+    diff_0 = E.shape[0]
     seq = []
     for _ in range(len(E)):
         E = remove_all_zero_rows(E)
+        if n_rows is not None:
+            if E.shape[0] == n_rows or abs(E.shape[0] - n_rows) >= diff_0:
+                return E
+            diff_0 = abs(n_rows - E.shape[0]) # update the difference
         seq.append(E)
         if len(E.row_space()) == len(E): # if all rows in E are independent
             return seq
@@ -169,5 +174,6 @@ def lempel_sequence(E: galois.GF(2)) -> List[galois.GF(2)]:
         x = (F[0] + Z[0]).reshape(1, -1)
         Z_tilde = Z + GF.Ones((len(Z), 1)) @ x
         E = np.vstack((Z_tilde[1:], F[1:]))
+        
 
 

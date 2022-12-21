@@ -118,10 +118,10 @@ class LinearityAttack:
                 if count >= budget:
                     break
         if len(S) == 0:
-            return s
+            return s, count
         S = np.unique(np.vstack(S), axis = 0).view(GF)
 
-        return S
+        return S, count
 
     def classical_sampling(
         self,
@@ -129,7 +129,8 @@ class LinearityAttack:
         budget: Optional[int] = 2**15,
         independent_candidate: bool = True,
         g_thres: int = None,
-        verbose: bool = False
+        verbose: bool = False,
+        require_count: bool = False
     ):
         '''
         Generate the samples to pass the verifier's test
@@ -137,7 +138,7 @@ class LinearityAttack:
         if g_thres is None:
             cor_func_list = np.array([2**(-g/2) for g in range(1, 6)])
             g_thres = np.abs(cor_func_list - 2/np.sqrt(n_samples)).argmin() + 1
-        S = self.extract_secret(10*self.P.shape[0], g_thres, budget = budget)
+        S, count = self.extract_secret(10*self.P.shape[0], g_thres, budget = budget)
         if independent_candidate:
             S = find_independent_sets(S)
         beta = []
@@ -148,7 +149,10 @@ class LinearityAttack:
         S_sorted = [S[k] for k in idx]
         beta_sorted = [beta[k] for k in idx]
         
-        return classical_samp_diff_bias(S_sorted, beta_sorted, n_samples, verbose)
+        if require_count:
+            return classical_samp_diff_bias(S_sorted, beta_sorted, n_samples, verbose), count
+        else:
+            return classical_samp_diff_bias(S_sorted, beta_sorted, n_samples, verbose)
 
 
 class QRCAttack(LinearityAttack):
@@ -330,7 +334,10 @@ def classical_samp_diff_bias(
     y_set = [GF.Zeros(S.shape[1])]
     for ele in beta_unique:
         b = (beta <= ele).astype(int).view(GF)
-        spe_sol, _ = solvesystem(S, b)
+        try:
+            spe_sol, _ = solvesystem(S, b)
+        except ValueError: # no solution
+            return classical_samp_same_bias(S[-1], beta[-1], n_samples, verbose = verbose)
         y_set.append(spe_sol)
     y_set = GF(y_set)
     basis = solvesystem(S, GF.Zeros((len(S), 1)))

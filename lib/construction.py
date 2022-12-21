@@ -240,7 +240,7 @@ class Factorization:
         else:
             self.H_rand = np.vstack((self.H_rand, H_rand))
 
-    def init_factor(self, idx = None):
+    def init_factor(self, n_rows = None):
         '''
         Construct the initial factorization, based on [Lempel 75]. 
         '''
@@ -257,10 +257,13 @@ class Factorization:
                     tmp = GF.Zeros((1, self.n))
                     tmp[0, [i, j]] = 1, 1
                     E = np.append(E, tmp, axis = 0)
-        lempel_seq = lempel_sequence(E)
-        if idx is None:
+        if n_rows is None:
+            lempel_seq = lempel_sequence(E)
             idx = self.rng.choice(len(lempel_seq))
-        return lempel_seq[idx]
+            return lempel_seq[idx]
+        else:
+            H_init = lempel_sequence(E, n_rows)
+            return H_init
 
     def satisfy_weight_constraint(self, E):
         '''
@@ -307,7 +310,7 @@ class Factorization:
         Z = Z + ones @ x.reshape(1, -1)
         return np.append(F, Z, axis = 0)
 
-    def final_factor(self, idx = None, rand_rows = 0):
+    def final_factor(self, n_rows = None, rand_rows = 0):
         '''
         Combine the subroutines to generate the final factorization.
         Args:
@@ -315,7 +318,10 @@ class Factorization:
             rand_rows: for stabilizer tableau randomization
         '''
         self.randomization(rand_rows)
-        E_init = self.init_factor(idx)
+        if n_rows is not None:
+            E_init = self.init_factor(n_rows - rand_rows)
+        else:
+            E_init = self.init_factor()
         E = self.satisfy_weight_constraint(E_init)
         H = self.injecting_ones(E)
         H = self.satisfy_weight_constraint(H)
@@ -401,30 +407,34 @@ def generate_QRC_instance(
 
 
 def generate_stab_instance(
-    n_init: int,
+    n: int,
     g: int,
-    rd_col_ext: int = 0,
+    exp_nullity: int = 0,
     verbose: bool = False
 ):
     '''
     Generate an instance of stabilizer construction, s.t. the number of rows in the main part and the redundant part are the same. 
     Args:
-        n_init: initial number of qubits
+        n_init: number of columns (qubits)
         g: the rank of the Gram matrix
-        rd_col_ext: the value of n-m/2
+        exp_nullity: the expected nullity, which is n-m/2
         verbose: whether to print the info
     '''
-    s = GF.Random(n_init)
-    tab = random_tableau(n_init, g, s)
+    n_cols_main = default_rng().choice(range(int(n/2), n+1))
+    s = GF.Random(n_cols_main)
+    tab = random_tableau(n_cols_main, g, s)
     stab_ins = Factorization(tab, s)
-    H_M = stab_ins.final_factor(rand_rows = int(n_init/5))
-    rd_col = rd_col_ext + H_M.shape[0] - H_M.shape[1]
-    if rd_col < 0:
-        rd_col = 0
+
+    n_rows_main = n - exp_nullity
+    n_rand_rows = default_rng().choice(range(int(n_rows_main/5)))
+    H_M = stab_ins.final_factor(n_rows = n_rows_main, rand_rows = n_rand_rows)
+    shape_before = H_M.shape
+    rd_col = n - n_cols_main
     H_M, s = add_col_redundancy(H_M, s, rd_col)
     H = add_row_redundancy(H_M, s, H_M.shape[0])
     H, s = obfuscation(H, s, 1000)
     if verbose:
+        print("shape of H_M before adding redundancy:", shape_before)
         print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
 
     return H, s
