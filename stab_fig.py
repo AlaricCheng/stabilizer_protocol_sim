@@ -104,28 +104,29 @@ def draw_fig(n):
     for i in range(3):
         tmp = {}
         for k, v in succ_prob.items():
-            tmp[k] = v[(v[:, 0] == 2**(args.thres + i))][0, 1] + 0.005
+            tweak = 0.000
+            tmp[k] = v[(v[:, 0] == 2**(args.thres + i))][0, 1] + tweak
         x_ticks = np.fromiter(tmp.keys(), dtype = float) + 0.04*(i-1)
-        ax.bar(x_ticks, tmp.values(), label = f"thres = {2**(args.thres+i)}", bottom = -0.005, width = 0.04)
+        ax.bar(x_ticks, tmp.values(), label = f"budget = {2**(args.thres+i)}", bottom = -tweak, width = 0.04)
     ax.set_xlabel("Max. of $n - \\frac{m}{2}$")
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.set_ylabel("Fraction of hacked instances")
     ax.set_ylim(-0.1, 1)
     ax.legend()
 
-    fig.savefig(f"./fig/linearity_attack_{n}.svg", bbox_inches = "tight")
+    fig.savefig(f"./fig/linearity_attack_{n}.{args.format}", bbox_inches = "tight")
 
 
 def test(n):
     tick = time()
-    H, s = lib.generate_stab_instance(n, 2, exp_nullity=4, verbose=args.verbose)
+    H, s = lib.generate_stab_instance(n, 2, exp_nullity=7, verbose=args.verbose)
     print("Generation time:", time() - tick)
     if args.verbose:
         print("True secret:", s)
     
     tick = time()
     LA = lib.LinearityAttack(H)
-    X, c = LA.classical_sampling(5000, budget=2**12, g_thres=args.g_thres, require_count=True, independent_candidate=True, verbose=args.verbose)
+    X, c = LA.classical_sampling(5000, budget=2**args.thres, g_thres=args.g_thres, require_count=True, independent_candidate=True, verbose=args.verbose)
     print((c, lib.hypothesis_test(s, X, bias(LA.get_Gs_rank(s)))))
     print("Attack time:", time() - tick)
 
@@ -144,6 +145,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--test", action = "store_true", help = "test the correctness of the code (default: False)")
     parser.add_argument("-v", "--verbose", action = "store_true", help = "verbose mode (default: False)")
+
+    parser.add_argument("--format", type = str, default = "svg", help = "format of the figure. Default is svg.")
 
     args = parser.parse_args()
 

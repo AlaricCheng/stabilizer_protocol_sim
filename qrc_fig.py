@@ -102,7 +102,8 @@ def draw_fig_original(q_list):
             data = json.load(f)
             counts, succ_prob = parse_dicts(data)
 
-        ax[0].errorbar(counts[:, 0], np.mean(counts[:, 1:], axis = 1), yerr=np.std(counts[:, 1:], axis = 1), fmt = "^--", color = "royalblue", label = f"q = {q}")
+        error_bar = np.std(counts[:, 1:], axis = 1)
+        ax[0].errorbar(counts[:, 0], np.mean(counts[:, 1:], axis = 1), yerr=error_bar, fmt = "^--", color = "royalblue", label = f"q = {q}")
         ax[1].plot(succ_prob.keys(), succ_prob.values(), "^--", color = "royalblue", label = f"q = {q}")
 
         ax[0].set_xlabel("Degree of column redundancy")
@@ -204,7 +205,7 @@ def draw_fig_enhanced(q_list):
             tmp = {}
             for k, v in succ_prob.items():
                 tmp[k] = v[(v[:, 0] == 2**(args.thres+i))][0, 1] # get the success probability for the corresponding budget
-            ax.plot(tmp.keys(), tmp.values(), "^--", label = f"thres = {2**(args.thres+i)}")
+            ax.plot(tmp.keys(), tmp.values(), "^--", label = f"budget = {2**(args.thres+i)}")
         ax.set_xlabel("Degree of column redundancy")
         ax.set_ylabel("Fraction of hacked instances")
         ax.legend()
