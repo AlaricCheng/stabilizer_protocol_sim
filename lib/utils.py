@@ -81,6 +81,8 @@ def solvesystem(
         if np.all(b_rd[free_var] == 0): 
             s_sol = specific_sol(A_rd, b_rd)
             if all_sol == True:
+                if len(null) == 0: # case: A is full column rank
+                    return s_sol
                 return np.vstack((s_sol, GF(complete_set) + s_sol))
             return s_sol, null
         else: # case: no solution

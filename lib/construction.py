@@ -10,7 +10,8 @@ GF = galois.GF(2)
 __all__ = [
     "random_main_part", "random_gram", "random_tableau",
     "add_row_redundancy", "add_col_redundancy", "Factorization", 
-    "QRCConstruction", "generate_QRC_instance", "generate_stab_instance"
+    "QRCConstruction", "generate_QRC_instance", "generate_stab_instance",
+    "generate_stab_instance_no_red_col"
 ]
 
 def random_main_part(n, g, s, seed = None):
@@ -314,7 +315,7 @@ class Factorization:
         '''
         Combine the subroutines to generate the final factorization.
         Args:
-            idx: index of the lempel sequence
+            n_rows: number of rows in the final factorization
             rand_rows: for stabilizer tableau randomization
         '''
         self.randomization(rand_rows)
@@ -437,4 +438,27 @@ def generate_stab_instance(
         print("shape of H_M before adding redundancy:", shape_before)
         print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
 
+    return H, s
+
+
+def generate_stab_instance_no_red_col(
+    n: int,
+    g: int,
+    n_rows = None,
+    verbose: bool = False
+):
+    s = GF.Random(n)
+    tab = random_tableau(n, g, s)
+    stab_ins = Factorization(tab, s)
+    
+    if n_rows is None:
+        n_rows = int(3*n/5)
+    n_rand_rows = default_rng().choice(range(int(n/5)))
+    H_M = stab_ins.final_factor(n_rows = n_rows, rand_rows = n_rand_rows)
+
+    H = add_row_redundancy(H_M, s, H_M.shape[0])
+    H, s = obfuscation(H, s, 1000)
+    if verbose:
+        print("rank of H_M:", rank(H_M), "\trank of H:", rank(H), "\tshape of H:", H.shape)
+    
     return H, s

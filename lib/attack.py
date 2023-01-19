@@ -22,7 +22,7 @@ def find_independent_sets(S: 'galois.GF(2)') -> 'galois.GF(2)':
 
 class LinearityAttack:
     '''
-    The inner-product attack algorithm and its analysis.
+    Linearity attack for general theta = pi/8 IQP circuits.
     '''
     def __init__(
         self, 
@@ -54,7 +54,7 @@ class LinearityAttack:
 
     def check_d(self, s):
         '''
-        Check whether d is in the null space of G_s. 
+        Check whether d is in the kernel of G_s. 
         This is only for testing purpose, and not for the actual attack
         '''
         P_s = self.get_P_d(s)
@@ -90,7 +90,8 @@ class LinearityAttack:
         self, 
         l: int,
         g_thres: int = 5,
-        budget: Optional[int] = 2**15
+        budget: Optional[int] = 2**15,
+        verbose: bool = False
     ):
         '''
         The extract secret subroutine of the Linearity attack.
@@ -109,11 +110,16 @@ class LinearityAttack:
             ker_M = solvesystem(M)
             if len(ker_M) == 0:
                 continue
+            if verbose:
+                print("The dimension of the kernel is: ", len(ker_M))
             for i in range(1, 2**(len(ker_M))):
                 y = int2bin(i, len(ker_M))
                 s = y.reshape(1, -1) @ ker_M
                 if self.get_Gs_rank(s) <= g_thres:
-                    S.append(s)
+                    b = self.P @ s.reshape(-1, 1)
+                    S.append(solvesystem(self.P, b, all_sol = True))
+                    if verbose:
+                        print(f"Found {len(S[-1])} equivalent secrets")
                 count += 1
                 if count >= budget:
                     break
@@ -138,7 +144,7 @@ class LinearityAttack:
         if g_thres is None:
             cor_func_list = np.array([2**(-g/2) for g in range(1, 6)])
             g_thres = np.abs(cor_func_list - 2/np.sqrt(n_samples)).argmin() + 1
-        S, count = self.extract_secret(10*self.P.shape[0], g_thres, budget = budget)
+        S, count = self.extract_secret(10*self.P.shape[0], g_thres, budget = budget, verbose=verbose)
         if independent_candidate:
             S = find_independent_sets(S)
         beta = []
@@ -173,63 +179,66 @@ class QRCAttack(LinearityAttack):
                 return False
         return True
 
-    def extract_secret_original(
-        self, 
-        l: int, 
-        budget: Optional[int] = None
-    ):
-        '''
-        The original extract secret subroutine of KM if `budget` is set to be None, which finds at most one secret
-        Args:
-            l (int): number of linear equations
-            budget (int): the maximum number of checking secrets
-        '''
-        count = 0
-        for _ in range(10):
-            self.regenerate_d()
-            M = self.get_M(l)
-            if M is None:
-                continue
+    # def extract_secret_original(
+    #     self, 
+    #     l: int, 
+    #     budget: Optional[int] = None
+    # ):
+    #     '''
+    #     The original extract secret subroutine of KM if `budget` is set to be None, which finds at most one secret
+    #     Args:
+    #         l (int): number of linear equations
+    #         budget (int): the maximum number of checking secrets
+    #     '''
+    #     count = 0
+    #     for _ in range(10):
+    #         self.regenerate_d()
+    #         M = self.get_M(l)
+    #         if M is None:
+    #             continue
 
-            ker_M = solvesystem(M)
-            if len(ker_M) == 0:
-                continue
-            for i in range(1, 2**(len(ker_M))):
-                y = int2bin(i, len(ker_M))
-                s = y.reshape(1, -1) @ ker_M
-                if self.check_weight(s):
-                    return s, count
-                count += 1
-                if budget is not None and count >= budget:
-                    return s, count
-        return s, count
+    #         ker_M = solvesystem(M)
+    #         if len(ker_M) == 0:
+    #             continue
+    #         for i in range(1, 2**(len(ker_M))):
+    #             y = int2bin(i, len(ker_M))
+    #             s = y.reshape(1, -1) @ ker_M
+    #             if self.check_weight(s):
+    #                 return s, count
+    #             count += 1
+    #             if budget is not None and count >= budget:
+    #                 return s, count
+    #     return s, count
 
-    def classical_sampling_original(
-        self, 
-        n_samples: int, 
-        budget: Optional[int] = None,
-        verbose: bool = False,
-        require_count: bool = False
-    ):
-        '''
-        Generate the samples to pass the verifier's test
-        '''
-        s, count = self.extract_secret_original(10*self.P.shape[0], budget=budget)
-        if require_count:
-            return classical_samp_same_bias(s, 0.854, n_samples, verbose = verbose), count
-        else:
-            return classical_samp_same_bias(s, 0.854, n_samples, verbose = verbose)
+    # def classical_sampling_original(
+    #     self, 
+    #     n_samples: int, 
+    #     budget: Optional[int] = None,
+    #     verbose: bool = False,
+    #     require_count: bool = False
+    # ):
+    #     '''
+    #     Generate the samples to pass the verifier's test
+    #     '''
+    #     s, count = self.extract_secret_original(10*self.P.shape[0], budget=budget)
+    #     if require_count:
+    #         return classical_samp_same_bias(s, 0.854, n_samples, verbose = verbose), count
+    #     else:
+    #         return classical_samp_same_bias(s, 0.854, n_samples, verbose = verbose)
 
-    def extract_secret_enhanced(
+    def extract_secret(
         self,
         l: int,
-        budget: Optional[int] = 2**15
+        budget: Optional[int] = 2**15,
+        one_sol: bool = False,
+        verbose: bool = False
     ):
         '''
         The enhanced extract secret subroutine for QRC-based construction, which finds a candidate set of secrets
         Args:
             l (int): number of linear equations
             budget (int): the maximum number of checking secrets
+            one_sol (bool): whether to return only one secret
         '''
         count = 0
         S = []
@@ -242,11 +251,16 @@ class QRCAttack(LinearityAttack):
             ker_M = solvesystem(M)
             if len(ker_M) == 0:
                 continue
+            if verbose:
+                print("Dimension of kernel: ", len(ker_M))
             for i in range(1, 2**(len(ker_M))):
                 y = int2bin(i, len(ker_M))
                 s = y.reshape(1, -1) @ ker_M
                 if self.check_weight(s):
-                    S.append(s)
+                    b = self.P @ s.reshape(-1, 1)
+                    S.append(solvesystem(self.P, b, all_sol = True))
+                    if one_sol:
+                        return np.unique(np.vstack(S), axis = 0).view(GF), count
                 count += 1
                 if count >= budget:
                     break
@@ -254,17 +268,18 @@ class QRCAttack(LinearityAttack):
             return s, count
         return np.unique(np.vstack(S), axis = 0).view(GF), count
 
-    def classical_sampling_enhanced(
+    def classical_sampling(
         self,
         n_samples: int, 
         budget: Optional[int] = 2**15,
         verbose: bool = False,
-        require_count: bool = False
+        require_count: bool = False,
+        one_sol: bool = False
     ):
         '''
         Generate the samples to pass the verifier's test
         '''
-        S, count = self.extract_secret_enhanced(10*self.P.shape[0], budget=budget)
+        S, count = self.extract_secret(10*self.P.shape[0], budget=budget, one_sol = one_sol, verbose=verbose)
         S_ind = find_independent_sets(S)
         if require_count:
             return classical_samp_same_bias(S_ind, 0.854, n_samples, verbose = verbose), count
@@ -321,7 +336,7 @@ def classical_samp_diff_bias(
     S = GF(S)
     beta = np.array(beta)
     if len(S.shape) == 1:
-        raise ValueError("There is only one candidate; use `classical_samp_same_bias` instead")
+        return classical_samp_same_bias(S, beta[0], n_samples, verbose = verbose)
     if verbose:
         print("candidate secret:\n", S)
     beta_unique = np.unique(beta)
