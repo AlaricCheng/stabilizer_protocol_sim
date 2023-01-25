@@ -5,6 +5,7 @@ from numpy.random import default_rng
 import galois
 import os, sys
 import re
+from tqdm import trange
 
 GF = galois.GF(2)
 
@@ -146,7 +147,7 @@ def lempel_sequence(E: galois.GF(2), n_rows = None) -> List[galois.GF(2)]:
     n = E.shape[1]
     diff_0 = E.shape[0]
     seq = []
-    for _ in range(len(E)):
+    for _ in trange(len(E), desc = "Constructing Lempel sequence"):
         E = remove_all_zero_rows(E)
         if n_rows is not None:
             if E.shape[0] == n_rows or abs(E.shape[0] - n_rows) >= diff_0:

@@ -452,8 +452,8 @@ def generate_stab_instance_no_red_col(
     stab_ins = Factorization(tab, s)
     
     if n_rows is None:
-        n_rows = int(3*n/5)
-    n_rand_rows = default_rng().choice(range(int(n/5)))
+        n_rows = int(2*n/3)
+    n_rand_rows = default_rng().choice(range(int(n/3)))
     H_M = stab_ins.final_factor(n_rows = n_rows, rand_rows = n_rand_rows)
 
     H = add_row_redundancy(H_M, s, H_M.shape[0])

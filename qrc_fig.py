@@ -53,6 +53,36 @@ def parse_dicts(dicts: list[dict]) -> Tuple:
     return dict_to_arr(count_dict), succ_dict 
 
 
+def attack_qrc(q, n2):
+    H, s = lib.generate_QRC_instance(q, q, n2)
+    X, count = lib.QRCAttack(H).classical_sampling(5000, budget = 2**args.budget, require_count=True, one_sol=True, verbose=True)
+
+    return count, lib.hypothesis_test(s, X, 0.854)
+
+
+def attack_qrc_parallel(q, n2, n_proc):
+    f = lambda args: attack_qrc(*args)
+    data_per_n2 = tpmap(Task(f), [(q, n2)]*n_proc, desc = f"q = {q}, n2 = {n2}")
+
+    return data_per_n2
+
+
+def collect_data(q):
+    data = {}
+    for n2 in range(int((q-1)/2) + 10, int((q-1)/2) + args.s_param + 1):
+        data[n2] = attack_qrc_parallel(q, n2, args.n_proc)
+        print(data[n2])
+    
+    return data
+
+
+def test(q):
+    print(collect_data(q))
+
+
+# ========================
+
+
 def attack_qrc_original(q, thres = 15, lim = 60) -> dict:
     '''
     Generate data for the original qrc attack. 
@@ -213,23 +243,19 @@ def draw_fig_enhanced(q_list):
         fig.savefig(f"./fig/enhanced_attack_{q}.svg")
 
 
-def test(q):
-    with open(f"./data/enhanced_attack_{q}.json", "r") as f:
-        data = json.load(f)
-        print(len(data))
-        data = merge_dict(data)
-        succ_prob = {k: get_succ_prob(v) for k, v in data.items()}
-    print(succ_prob)
+
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("type", type = str, help = "the type of attack ('original' or 'enhanced'")
+    parser.add_argument("--type", type = str, help = "the type of attack ('original' or 'enhanced')")
     parser.add_argument("-p", "--n-proc", type = int, default = 3, help = "number of processors used")
     parser.add_argument("--data", action = "store_true", help = "collect data (default: False)")
     parser.add_argument("--fig", action = "store_true", help = "generate figures (default: False)")
 
     parser.add_argument("-q", nargs="*", type = int, default=[7], help = "the start point of size parameters for QRC")
+    parser.add_argument("--s-param", type = int, default = 10, help = "the security parameter")
+    parser.add_argument("--budget", type = int, default = 30, help = "budget in the log base of 2")
     parser.add_argument("--thres", type = int, default = 15, help = "budget is 2^thres")
     parser.add_argument("--rep", type = int, default=30, help = "Number of repetitions for attacking each instance")
     parser.add_argument("--lim", type = int, default=60, help = "the range of column redundancy")
@@ -254,6 +280,6 @@ if __name__ == "__main__":
             draw_fig_enhanced(q_list)
 
     if args.test:
-        test(151)
+        test(31)
 
 
