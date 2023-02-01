@@ -49,7 +49,7 @@ class LinearityAttack:
         '''
         d = GF(d)
         idx = self.P @ d.reshape(-1, 1)
-        P_s = self.P[idx.flatten().view(np.ndarray).astype(bool)]
+        P_s = self.P[(idx == 1).flatten()]
         return P_s
 
     def check_d(self, s):
@@ -80,7 +80,7 @@ class LinearityAttack:
         while len(M) < size:
             e = GF.Random(self.n_col, seed = self.rng)
             idx = P_d @ e.reshape(-1, 1)
-            P_de = P_d[idx.flatten().view(np.ndarray).astype(bool)]
+            P_de = P_d[(idx == 1).flatten()]
             if len(P_de) == 0:
                 continue
             M.append(np.sum(P_de, axis = 0))
