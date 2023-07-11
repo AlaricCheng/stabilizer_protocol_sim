@@ -9,7 +9,6 @@ from tqdm import trange
 
 GF = galois.GF(2)
 
-# %%
 bias = lambda g: (1+2**(-g/2))/2
 
 def load_data(fname):
@@ -21,6 +20,12 @@ def load_data(fname):
                 return H, s
     return H
 
+def hamming_weight(x: "galois.FieldArray"):
+    """
+    Hamming weight of x
+    """
+    return np.sum(x.view(np.ndarray))
+    
 class HiddenPrints:
     '''
     suppress the printing in function calls
@@ -63,7 +68,7 @@ def solvesystem(
     assert len(A) != 0, "Empty matrix!"
     A = A.view(GF)
     n = A.shape[1] # n_cols
-    null = A.null_space() # basis matrix of null space
+    null = A.null_space() # basis matrix of null space of rows of A
     if all_sol == True:
         complete_set = [int2bin(i, len(null)) @ null for i in range(1, 2**(len(null)))] # # linear combination of all vectors in null space
 
@@ -88,6 +93,34 @@ def solvesystem(
             return s_sol, null
         else: # case: no solution
             return [] 
+
+def check_element(C, x):
+    """
+    Check whether x is in the column space of C
+    """
+    if solvesystem(C, x) == []:
+        return False
+    else:
+        return True
+    
+def fix_basis(A: 'galois.GF(2)', basis: 'galois.GF(2)'):
+    """
+    Change the first k columns of basis to be the columns of A.
+    """
+    for b in basis.T:
+        if not check_element(A, b):
+            A = np.concatenate((A, b.reshape(-1, 1)), axis = 1)
+    
+    return A
+
+def sample_column_space(basis: 'galois.GF(2)', seed = None):
+    """
+    Given a basis in the form of a matrix, sample a random vector from its column space.
+    """
+    n = basis.shape[1]
+    x = GF.Random((n, 1), seed = seed)
+
+    return basis @ x
 
 def specific_sol(A, b):
     '''
