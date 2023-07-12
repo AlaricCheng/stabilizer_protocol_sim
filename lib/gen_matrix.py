@@ -74,11 +74,12 @@ def sample_D(m1, d):
             D = np.concatenate((D, a1), axis = 1)
         else:
             tmp = np.concatenate((D, a1), axis = 1)
-            kernel_D_complement = complement_subspace_basis(kernel_D, tmp) # ker(D^T) / <c_1, ..., c_t, a_1>
-
-            a2 = sample_even_parity_vector(kernel_D_complement)
-            if a2 is None:
+            tmp_kernel = tmp.T.null_space().T
+            tmp_kernel_complement = complement_subspace_basis(tmp_kernel, tmp) # ker(D^T) / <c_1, ..., c_t, a_1> so that a2 . a1 = 0
+            if tmp_kernel_complement.shape[1] == 0: # if tmp_kernel_complement is empty
                 break
+
+            a2 = sample_even_parity_vector(tmp_kernel_complement)
             if hamming_weight(a2) % 4 == 0:
                 D = np.concatenate((D, a2), axis = 1)
             else:

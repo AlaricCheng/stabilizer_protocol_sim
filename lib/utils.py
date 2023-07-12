@@ -118,9 +118,11 @@ def sample_column_space(basis: 'galois.GF(2)', seed = None):
     Given a basis in the form of a matrix, sample a random vector from its column space.
     """
     n = basis.shape[1]
-    x = GF.Random((n, 1), seed = seed)
+    for _ in range(20):
+        x = GF.Random((n, 1), seed = seed)
+        if hamming_weight(x) != 0:
 
-    return basis @ x
+            return basis @ x
 
 def specific_sol(A, b):
     '''
