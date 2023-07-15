@@ -1,11 +1,10 @@
 # %%
-from typing import Union, Optional, List
+from typing import Union, Optional
 import numpy as np
 from numpy.random import default_rng
 import galois
 import os, sys
 import re
-from tqdm import trange
 
 GF = galois.GF(2)
 
@@ -78,7 +77,7 @@ def solvesystem(
             return GF(complete_set)
         return null
     else: # b != 0
-        assert A.shape[0] == b.shape[0], "Inconsistent shapes"
+        assert A.shape[0] == len(b), f"Inconsistent shapes, {A.shape[0]} and {len(b)}"
         Ab = np.hstack((A, b.reshape(-1, 1)))
         Ab_reduced = Ab.row_reduce() # Gaussian elimination
         A_rd = Ab_reduced[:, :n]
@@ -148,70 +147,34 @@ def rank(A):
     '''
     return np.sum(~np.all(A.row_reduce() == 0, axis=1))
 
-def remove_all_zero_rows(A: galois.GF(2)):
-    '''
-    remove the all-zero rows from A
-    '''
-    bool_idx = np.any(A != 0, axis = 1)
-    return A[bool_idx]
 
-def KF_partition(A: galois.GF(2)):
+def rand_inv_mat(n, seed = None):
     '''
-    Given a matrix A, reorder it into (K \\ F) s.t. K.1 = 0
+    Generate a random invertible matrix of size n x n
     '''
-    A = remove_all_zero_rows(A)
-    ind_row = A[0:1]
-    for row in A[1:]:
-        tmp = np.append(ind_row, row.reshape(1, -1), axis = 0)
-        if len(tmp.row_space()) == len(ind_row):
-            x = solvesystem(ind_row.T, row)[0]
-            y = GF.Zeros(len(A) - len(x))
-            y[0] = 1
-            x = np.append(x, y)
-            break
-        ind_row = tmp
-    K = A[x == 1]
-    F = A[x == 0]
+    rng = wrap_seed(seed)
+    A = GF.Random((n, n), seed = rng)
+    while rank(A) != n:
+        A = GF.Random((n, n), seed = rng)
 
-    return K, F
-
-def lempel_sequence(E: galois.GF(2), n_rows = None) -> List[galois.GF(2)]:
-    '''
-    Find the Lempel sequence. If n_rows is not None, return the factor whose number of rows is closest to n_rows.
-    '''
-    n = E.shape[1]
-    diff_0 = E.shape[0]
-    seq = []
-    for _ in trange(len(E), desc = "Constructing Lempel sequence"):
-        E = remove_all_zero_rows(E)
-        if n_rows is not None:
-            if E.shape[0] == n_rows or abs(E.shape[0] - n_rows) >= diff_0:
-                return E
-            diff_0 = abs(n_rows - E.shape[0]) # update the difference
-        seq.append(E)
-        if len(E.row_space()) == len(E): # if all rows in E are independent
-            return seq
-        elif len(E) == 3:
-            K, F = KF_partition(E)
-            if len(F) == 1:
-                E = F
-                continue
-            elif len(F) == 0:
-                return seq
-        
-        K, F = KF_partition(E)
-        if len(K) == 2:
-            E = F
-            continue
-        elif len(K) % 2 == 0:
-            Z = K
-        else:
-            Z = np.vstack((K, GF.Zeros((1, n))))
-        if len(F) == 0:
-            F = GF.Zeros((1, n))
-        x = (F[0] + Z[0]).reshape(1, -1)
-        Z_tilde = Z + GF.Ones((len(Z), 1)) @ x
-        E = np.vstack((Z_tilde[1:], F[1:]))
-        
+    return A
 
 
+def get_H_s(H: "galois.FieldArray", s: 'galois.FieldArray'):
+        '''
+        Get H_s by deleting rows that are orthogonal to s
+        '''
+        idx = H @ s.reshape(-1, 1)
+        H_s = H[(idx == 1).flatten()]
+
+        return H_s
+
+
+def get_R_s(H: "galois.FieldArray", s: 'galois.FieldArray'):
+        '''
+        Get R_s by deleting rows that are not orthogonal to s
+        '''
+        idx = H @ s.reshape(-1, 1)
+        R_s = H[(idx == 0).flatten()]
+
+        return R_s

@@ -1,7 +1,7 @@
 import pytest
 import galois
 import lib
-from lib.construction import generate_QRC_instance
+from lib.mat_factor import generate_QRC_instance
 from lib.attack import QRCAttack, LinearityAttack
 
 
