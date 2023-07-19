@@ -1,7 +1,5 @@
-# import pytest
 import numpy as np
 from numpy.random import default_rng
-import lib
 from lib.utils import wrap_seed, solvesystem
 import galois
 

@@ -122,6 +122,30 @@ def sample_column_space(basis: 'galois.GF(2)', seed = None):
         if hamming_weight(x) != 0:
 
             return basis @ x
+        
+def iter_column_space(basis: "galois.FieldArray"):
+    """
+    Iterate over the column space of basis. Use next() to get the next vector.
+    """
+    n = basis.shape[1]
+    for i in range(1, 2**n):
+        x = int2bin(i, n).reshape(-1, 1)
+
+        yield basis @ x
+
+
+def random_codeword(basis: "galois.FieldArray", seed = None):
+    """
+    return a random codeword from the column space of basis
+    """
+    n = basis.shape[1]
+    for _ in range(20):
+        x = GF.Random((n, 1), seed = seed)
+        if hamming_weight(x) != 0:
+            break
+
+    return basis @ x
+
 
 def specific_sol(A, b):
     '''
@@ -178,3 +202,20 @@ def get_R_s(H: "galois.FieldArray", s: 'galois.FieldArray'):
         R_s = H[(idx == 0).flatten()]
 
         return R_s
+
+
+def get_D_space(H: "galois.FieldArray", g):
+    """
+    Get D = C \bigcap C^{\perp} 
+    """
+    H = H.column_space().T
+    D = []
+    for i in range(H.shape[1] - g):
+        for _ in range(10*2**g):
+            c = random_codeword(H)
+            if (H.T @ c == 0).all():
+                D.append(c)
+                break
+        H = fix_basis(c, H)[:, 1:]
+
+    return np.concatenate(D, axis=1)

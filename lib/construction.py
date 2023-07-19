@@ -129,7 +129,7 @@ def qrc_construction(n, m, q):
 
     H, s = obfuscation(H, s)
 
-    return H, s
+    return H, s.reshape(-1, 1)
 
 
 def is_prime(n):
