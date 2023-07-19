@@ -10,7 +10,7 @@ def random_doubly_even_vector(m1):
     """
     Sample a random vector of length t with weight a multiple of 4
     """
-    multiples_of_4 = [i for i in range(4, m1, 4)]
+    multiples_of_4 = [i for i in range(4, m1+1, 4)]
     h = default_rng().choice(multiples_of_4)
     vector = GF.Zeros(m1)
     idx = default_rng().choice(m1, h, replace=False) # idx to be flipped

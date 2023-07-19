@@ -9,14 +9,11 @@ GF = galois.GF(2)
 
 
 def sample_parameters(n, m, g):
-    for _ in range(10):
-        m1 = default_rng().binomial(m, 1/2) # m1 \approx m/2
-        if m1 % 2 == g % 2: 
-            break
-
-    for _ in range(10):
-        d = default_rng().binomial(int(m1/2), 0.7) # d <= m1/2
-        if g + d <= n and n - g - d <= m - m1 and g + 2*d <= m1:
+    for _ in range(30):
+        tmp = [i for i in range(g, m, 2) if i >= 4 and i > g] # m1 = g mod 2, m1 > g
+        m1 = default_rng().choice(tmp)
+        d = default_rng().choice(range(1, int((m1-g)/2)+1)) # g + 2*d <= m1
+        if g + d <= n and n - g - d <= m - m1:
             break
 
     return m1, d
@@ -47,15 +44,20 @@ def add_row_redundancy(H_s: "galois.FieldArray", s: "galois.FieldArray", m2: int
     return R_s
 
 
-def initialization(n, m, g):
+def initialization(n, m, g, m1=None, d=None):
     """
     Initialization of the construction, where H_s = (F, D, 0) 
     """
-    m1, d = sample_parameters(n, m, g)
+    if m1 is None or d is None:
+        m1, d = sample_parameters(n, m, g)
+    print("m1, d:", m1, d)
     D = sample_D(m1, d)
-    F = sample_F(m1, g, D)
-    zeros = GF.Zeros((m1, n-g-d))
-    H_s = np.concatenate((F, D, zeros), axis=1)
+    zeros = GF.Zeros((m1, n-g-D.shape[1]))
+    if g == 0:
+        H_s = np.concatenate((D, zeros), axis=1)
+    else:
+        F = sample_F(m1, g, D)
+        H_s = np.concatenate((F, D, zeros), axis=1)
 
     u = GF.Ones((m1, 1))
     s = solvesystem(H_s, u)[0]
@@ -63,7 +65,7 @@ def initialization(n, m, g):
     R_s = add_row_redundancy(H_s, s, m-m1)
     H = np.concatenate((H_s, R_s), axis=0)
 
-    return H, s
+    return H, s.reshape(-1, 1)
 
 
 def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray"):
@@ -72,20 +74,20 @@ def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray"):
     where P is a random permutation matrix 
     and Q is a random invertible matrix
     """
-    H = default_rng().permutation(H).view(GF)
+    H = default_rng().permutation(H).view(GF) # row permutations
 
     Q = rand_inv_mat(H.shape[1])
-    H = H @ Q
+    H = H @ Q # column operations
     s = np.linalg.inv(Q) @ s
 
     return H, s
 
 
-def stabilizer_construction(n, m, g):
+def stabilizer_construction(n, m, g, m1=None, d=None):
     """
     Generate an IQP matrix H and a secret s, so that the correlation function is 2^{-g/2}
     """
-    H, s = initialization(n, m, g)
+    H, s = initialization(n, m, g, m1, d)
     H, s = obfuscation(H, s)
 
     return H, s
