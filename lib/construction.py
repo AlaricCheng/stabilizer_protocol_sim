@@ -46,11 +46,11 @@ def add_row_redundancy(H_s: "galois.FieldArray", s: "galois.FieldArray", m2: int
 
 def initialization(n, m, g, m1=None, d=None):
     """
-    Initialization of the construction, where H_s = (F, D, 0) 
+    Initialization of the stabilizer construction, where H_s = (F, D, 0) 
     """
     if m1 is None or d is None:
         m1, d = sample_parameters(n, m, g)
-    print("m1, d:", m1, d)
+    print("m1, d, m2:", m1, d, m-m1)
     D = sample_D(m1, d)
     zeros = GF.Zeros((m1, n-g-D.shape[1]))
     if g == 0:

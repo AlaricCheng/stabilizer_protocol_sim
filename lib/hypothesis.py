@@ -15,6 +15,7 @@ def hypothesis_test(s, X, bias):
         return False
     tolarence = 2/np.sqrt(len(X))
     count = 0
+    s = s.flatten()
     for x in X:
         if np.dot(s, x) == 0:
             count += 1
