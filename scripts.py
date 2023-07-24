@@ -6,8 +6,8 @@ import json
 
 from lib.construction import qrc_construction, stabilizer_construction
 from lib.attack import extract_one_secret, sampling_with_H
-from lib.hypothesis import hypothesis_test
-from lib.utils import bias, get_H_s, rank
+from lib.hypothesis import hypothesis_test, bias
+from lib.utils import get_H_s, rank
 from lib.parallel import *
 
 GF = galois.GF(2)
@@ -16,7 +16,6 @@ def fix_SB(q, max_iter = 2**15, n_repeats = 100):
     r = int((q+1)/2)
     m = 2*q
     g = 1
-    beta = bias(g)
     
     res = {}
     for n in range(r, r+q, 2):
@@ -24,6 +23,7 @@ def fix_SB(q, max_iter = 2**15, n_repeats = 100):
         res[n] = []
         def helper(_):
             H, s = qrc_construction(n, m, q)
+            beta = bias(H, s)
             s_candidate, count = extract_one_secret(H, max_iter = max_iter, check = "qrc")
             if s_candidate is None:
                 return False, count
@@ -40,7 +40,6 @@ def compared_with_qrc(q, max_iter = 2**15, n_repeats = 100):
     r = int((q+1)/2)
     m = 2*q
     g = 1
-    beta = bias(g)
 
     res = {}
     for n in range(r, r+q, 2):
@@ -48,6 +47,7 @@ def compared_with_qrc(q, max_iter = 2**15, n_repeats = 100):
         res[n] = []
         def helper(_):
             H, s = stabilizer_construction(n, m, g)
+            beta = bias(H, s)
             s_candidate, count = extract_one_secret(H, max_iter = max_iter, check = "rank")
             if s_candidate is None:
                 return False, count
