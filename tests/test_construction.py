@@ -1,13 +1,15 @@
 import pytest
 import galois
+import math
 from lib.construction import initialization, stabilizer_construction, qrc_construction
 from lib.utils import rank, get_H_s, get_R_s
+from lib.hypothesis import correlation_function
 
 GF = galois.GF(2)
 
 
 @pytest.mark.parametrize("n, m, g", [(7, 15, 1), (20, 25, 2), (30, 35, 3), (40, 45, 4)])
-def test_initialization(n, m, g):
+def test_stabilizer_construction(n, m, g):
     H, s = initialization(n, m, g)
     assert rank(H) == n
 
@@ -21,6 +23,7 @@ def test_initialization(n, m, g):
     assert (H_s @ s == 1).all()
 
     assert rank(H_s.T @ H_s) == g
+    assert abs(correlation_function(H, s)) == 2**(-g/2)
 
 
 @pytest.mark.parametrize("n, m, q", [(5, 15, 7), (15, 30, 23), (45, 60, 31), (75, 100, 47)])
@@ -33,3 +36,4 @@ def test_qrc_construction(n, m, q):
     assert (R_s @ s == 0).all()
     assert (H_s @ s == 1).all()
     assert rank(H_s.T @ H_s) == 1
+    assert correlation_function(H, s) == 2**(-1/2)

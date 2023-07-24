@@ -8,8 +8,6 @@ import re
 
 GF = galois.GF(2)
 
-bias = lambda g: (1+2**(-g/2))/2
-
 def load_data(fname):
     H = np.loadtxt(fname, dtype=int).view(GF)
     with open(fname, "r") as f:
@@ -92,6 +90,19 @@ def solvesystem(
             return s_sol, null
         else: # case: no solution
             return [] 
+        
+
+def random_solution(A, b, seed = None):
+    """
+    Generate a random solution to A x = b
+    """
+    rng = wrap_seed(seed)
+    s_sol, null = solvesystem(A, b)
+    if len(null) == 0:
+        return s_sol
+    else:
+        return s_sol + sample_column_space(null.T, seed = rng).flatten()
+    
 
 def check_element(C, x):
     """
@@ -116,9 +127,10 @@ def sample_column_space(basis: 'galois.GF(2)', seed = None):
     """
     Given a basis in the form of a matrix, sample a random vector from its column space.
     """
+    rng = wrap_seed(seed)
     n = basis.shape[1]
     for _ in range(20):
-        x = GF.Random((n, 1), seed = seed)
+        x = GF.Random((n, 1), seed = rng)
         if hamming_weight(x) != 0:
 
             return basis @ x
@@ -136,7 +148,8 @@ def iter_column_space(basis: "galois.FieldArray"):
 
 def random_codeword(basis: "galois.FieldArray", seed = None):
     """
-    return a random codeword from the column space of basis
+    Return a random codeword from the column space of basis. 
+    The output codeword will not be all-zero
     """
     n = basis.shape[1]
     for _ in range(20):
@@ -169,7 +182,7 @@ def rank(A):
     '''
     Return the rank of a matrix A.
     '''
-    return np.sum(~np.all(A.row_reduce() == 0, axis=1))
+    return int(np.sum(~np.all(A.row_reduce() == 0, axis=1)))
 
 
 def rand_inv_mat(n, seed = None):
@@ -219,3 +232,13 @@ def get_D_space(H: "galois.FieldArray", g):
         H = fix_basis(c, H)[:, 1:]
 
     return np.concatenate(D, axis=1)
+
+
+def check_D_doubly_even(D):
+    """
+    check whether D spans a doubly-even code
+    """
+    for c in D.T:
+        if hamming_weight(c) % 4 != 0:
+            return False
+    return True

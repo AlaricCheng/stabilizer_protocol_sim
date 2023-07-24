@@ -2,27 +2,29 @@ import numpy as np
 from numpy.random import default_rng
 import galois
 
-from lib.utils import check_element, rank, sample_column_space, hamming_weight, solvesystem, rand_inv_mat
+from lib.utils import check_element, rank, sample_column_space, hamming_weight, solvesystem, rand_inv_mat, wrap_seed, random_solution
 from lib.gen_matrix import sample_D, sample_F
 
 GF = galois.GF(2)
 
 
-def sample_parameters(n, m, g):
+def sample_parameters(n, m, g, seed = None):
+    rng = wrap_seed(seed)
     for _ in range(30):
         tmp = [i for i in range(g, m, 2) if i >= 4 and i > g] # m1 = g mod 2, m1 > g
-        m1 = default_rng().choice(tmp)
-        d = default_rng().choice(range(1, int((m1-g)/2)+1)) # g + 2*d <= m1
-        if g + d <= n and n - g - d <= m - m1:
+        m1 = tmp[rng.binomial(len(tmp)-1, 0.5)]
+        d = rng.binomial(int((m1-g)/2), 0.5) # g + 2*d <= m1
+        if g + d <= n and n - g - d <= m - m1 and d > 0:
             break
 
     return m1, d
 
 
-def add_row_redundancy(H_s: "galois.FieldArray", s: "galois.FieldArray", m2: int):
+def add_row_redundancy(H_s: "galois.FieldArray", s: "galois.FieldArray", m2: int, seed = None):
     """
     Generating R_s so that R_s.s = 0 and the joint row space of H_s and R_s is n
     """
+    rng = wrap_seed(seed)
     n = H_s.shape[1]
     r = rank(H_s)
 
@@ -37,58 +39,61 @@ def add_row_redundancy(H_s: "galois.FieldArray", s: "galois.FieldArray", m2: int
     R_s = full_basis[r:] # guarantee that rank(H) = n
 
     while R_s.shape[0] < m2:
-        p = sample_column_space(s_null_space.T)
+        p = sample_column_space(s_null_space.T, seed = rng)
         if hamming_weight(p) != 0:
             R_s = np.concatenate((R_s, p.T), axis=0)
 
     return R_s
 
 
-def initialization(n, m, g, m1=None, d=None):
+def initialization(n, m, g, m1=None, d=None, seed = None):
     """
     Initialization of the stabilizer construction, where H_s = (F, D, 0) 
     """
+    rng = wrap_seed(seed)
     if m1 is None or d is None:
-        m1, d = sample_parameters(n, m, g)
+        m1, d = sample_parameters(n, m, g, seed = rng)
     print("m1, d, m2:", m1, d, m-m1)
-    D = sample_D(m1, d)
+    D = sample_D(m1, d, seed = rng)
     zeros = GF.Zeros((m1, n-g-D.shape[1]))
     if g == 0:
         H_s = np.concatenate((D, zeros), axis=1)
     else:
-        F = sample_F(m1, g, D)
+        F = sample_F(m1, g, D, seed = rng)
         H_s = np.concatenate((F, D, zeros), axis=1)
 
     u = GF.Ones((m1, 1))
-    s = solvesystem(H_s, u)[0]
+    s = random_solution(H_s, u, seed = rng)
 
-    R_s = add_row_redundancy(H_s, s, m-m1)
+    R_s = add_row_redundancy(H_s, s, m-m1, seed = rng)
     H = np.concatenate((H_s, R_s), axis=0)
 
     return H, s.reshape(-1, 1)
 
 
-def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray"):
+def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray", seed = None):
     """
     H <-- P H Q and s <-- Q^{-1} s, 
     where P is a random permutation matrix 
     and Q is a random invertible matrix
     """
-    H = default_rng().permutation(H).view(GF) # row permutations
+    rng = wrap_seed(seed)
+    H = rng.permutation(H).view(GF) # row permutations
 
-    Q = rand_inv_mat(H.shape[1])
+    Q = rand_inv_mat(H.shape[1], seed = rng)
     H = H @ Q # column operations
     s = np.linalg.inv(Q) @ s
 
     return H, s
 
 
-def stabilizer_construction(n, m, g, m1=None, d=None):
+def stabilizer_construction(n, m, g, m1=None, d=None, seed = None):
     """
     Generate an IQP matrix H and a secret s, so that the correlation function is 2^{-g/2}
     """
-    H, s = initialization(n, m, g, m1, d)
-    H, s = obfuscation(H, s)
+    rng = wrap_seed(seed)
+    H, s = initialization(n, m, g, m1, d, seed = rng)
+    H, s = obfuscation(H, s, seed = rng)
 
     return H, s
 
@@ -104,10 +109,11 @@ def quad_res_mod_q(q):
     return list(set(QRs))
 
 
-def qrc_construction(n, m, q):
+def qrc_construction(n, m, q, seed = None):
     """
     construct QRC-IQP instance
     """
+    rng = wrap_seed(seed)
     m1 = q
     r = int((q+1)/2) # dim of QRC
 
@@ -122,12 +128,12 @@ def qrc_construction(n, m, q):
         H_s = np.concatenate((H_s, zeros), axis=1)
 
     u = GF.Ones((m1, 1))
-    s = solvesystem(H_s, u)[0]
+    s = random_solution(H_s, u, seed = rng)
 
-    R_s = add_row_redundancy(H_s, s, m-m1)
+    R_s = add_row_redundancy(H_s, s, m-m1, seed = rng)
     H = np.concatenate((H_s, R_s), axis=0)
 
-    H, s = obfuscation(H, s)
+    H, s = obfuscation(H, s, seed = rng)
 
     return H, s.reshape(-1, 1)
 

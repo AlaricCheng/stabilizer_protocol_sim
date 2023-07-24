@@ -3,19 +3,10 @@ from typing import Optional, Union
 import numpy as np
 from numpy.random import default_rng
 import galois
-from lib.utils import solvesystem, rank, wrap_seed, int2bin, bias, get_H_s, iter_column_space, random_codeword, hamming_weight, get_R_s, get_D_space
+from lib.utils import solvesystem, rank, wrap_seed, int2bin, get_H_s, iter_column_space, random_codeword, hamming_weight, get_R_s, get_D_space, check_D_doubly_even
+from lib.hypothesis import bias
 
 GF = galois.GF(2)
-
-
-def check_D_doubly_even(D):
-    """
-    check whether D spans a doubly-even code
-    """
-    for c in D.T:
-        if hamming_weight(c) % 4 != 0:
-            return False
-    return True
 
 
 def property_check(H, s_i, rank_thres = 5):
@@ -83,8 +74,7 @@ def naive_sampling(H, s, n_samples):
     Output x s.t. x.s = 0 with probability beta_s
     and x.s = 1 w.p. 1 - beta_s
     """
-    H_s = get_H_s(H, s)
-    beta_s = bias(rank(H_s.T @ H_s))
+    beta_s = bias(H, s)
     s = s.reshape(1, -1)
     for _ in range(10):
         x = GF.Random((1, H.shape[1]))
@@ -111,7 +101,7 @@ def sampling_with_H(H, s, n_samples):
     """
     H_s = get_H_s(H, s)
     R_s = get_R_s(H, s)
-    beta_s = bias(rank(H_s.T @ H_s))
+    beta_s = bias(H, s)
     s = s.reshape(1, -1)
     
     X = []
