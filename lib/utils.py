@@ -104,14 +104,24 @@ def random_solution(A, b, seed = None):
         return s_sol + sample_column_space(null.T, seed = rng).flatten()
     
 
+# def check_element(C, x):
+#     """
+#     Check whether x is in the column space of C
+#     """
+#     if solvesystem(C, x) == []:
+#         return False
+#     else:
+#         return True
+
 def check_element(C, x):
     """
     Check whether x is in the column space of C
     """
-    if solvesystem(C, x) == []:
-        return False
-    else:
+    tmp = np.concatenate((C, x.reshape(-1, 1)), axis = 1)
+    if rank(tmp) == rank(C):
         return True
+    else:
+        return False
     
 def fix_basis(A: 'galois.GF(2)', basis: 'galois.GF(2)'):
     """
@@ -230,7 +240,8 @@ def get_D_space(H: "galois.FieldArray", g):
                 D.append(c)
                 break
         H = fix_basis(c, H)[:, 1:]
-
+    if D == []:
+        return None
     return np.concatenate(D, axis=1)
 
 
@@ -238,7 +249,8 @@ def check_D_doubly_even(D):
     """
     check whether D spans a doubly-even code
     """
-    for c in D.T:
-        if hamming_weight(c) % 4 != 0:
-            return False
+    if D is not None:
+        for c in D.T:
+            if hamming_weight(c) % 4 != 0:
+                return False
     return True

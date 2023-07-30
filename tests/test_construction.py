@@ -8,7 +8,7 @@ from lib.hypothesis import correlation_function
 GF = galois.GF(2)
 
 
-@pytest.mark.parametrize("n, m, g", [(7, 15, 1), (20, 25, 2), (30, 35, 3), (40, 45, 4)])
+@pytest.mark.parametrize("n, m, g", [(7, 15, 1), (20, 25, 2), (30, 35, 3), (40, 45, 4), (11, 14, 1)])
 def test_stabilizer_construction(n, m, g):
     H, s = initialization(n, m, g)
     assert rank(H) == n

@@ -4,6 +4,7 @@ import lib
 from lib.construction import qrc_construction, stabilizer_construction
 from lib.utils import get_H_s
 from lib.attack import classical_samp_same_bias, classical_samp_diff_bias, qrc_check, property_check, extract_one_secret, naive_sampling, sampling_with_H
+from lib.hypothesis import bias
 
 GF = galois.GF(2)
 
@@ -25,7 +26,7 @@ def test_property_check(q):
     m = 2*q
     H, s = qrc_construction(n, m, q)
 
-    assert property_check(H, s)
+    assert property_check(H, s, 1)
 
     H, s = stabilizer_construction(n, m, 2)
 
@@ -47,12 +48,14 @@ def test_sampling():
     n = 20
     m = 30
     H, s = stabilizer_construction(n, m, 1)
+
+    beta = bias(H, s)
     
     X = naive_sampling(H, s, 10000)
-    assert lib.hypothesis_test(s, X, 0.854)
+    assert lib.hypothesis_test(s, X, beta)
 
     X = sampling_with_H(H, s, 10000)
-    assert lib.hypothesis_test(s, X, 0.854)
+    assert lib.hypothesis_test(s, X, beta)
 
 
 def test_classical_samp_same_bias():

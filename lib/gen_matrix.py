@@ -75,6 +75,8 @@ def sample_D(m1, d, seed = None):
         kernel_D_complement = complement_subspace_basis(kernel_D, D) # ker(D^T) / <c_1, ..., c_t>
         a1 = sample_even_parity_vector(kernel_D_complement, seed = rng)
         
+        if a1 is None:
+            break
         if hamming_weight(a1) % 4 == 0:
             D = np.concatenate((D, a1), axis = 1)
         else:
