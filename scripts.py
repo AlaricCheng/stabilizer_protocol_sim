@@ -59,14 +59,14 @@ def compared_with_qrc(q, max_iter = 2**15, n_repeats = 100):
     return res
 
 
-def stab_scheme(g, g_thres, n_init = 50, m = 200, max_iter = 2**15, n_repeats = 100):
+def stab_scheme(g, g_thres, n_init = 80, m = 200, max_iter = 2**15, n_repeats = 100):
     res = {}
 
     for n in range(n_init, m - 30, 5):
-        print("n =", n)
         res[n] = []
         def helper(_):
             H, s = stabilizer_construction(n, m, g)
+            print(H.shape, rank(H))
             s_candidate, count = extract_one_secret(H, max_iter = max_iter, check = "rank", g_thres = g_thres)
             if s_candidate is None:
                 return False, count

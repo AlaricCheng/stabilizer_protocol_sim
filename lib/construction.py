@@ -12,8 +12,8 @@ def sample_parameters(n, m, g, seed = None):
     rng = wrap_seed(seed)
     for _ in range(30):
         tmp = [i for i in range(g, m, 2) if i >= 4 and i > g] # m1 = g mod 2, m1 > g
-        m1 = tmp[rng.binomial(len(tmp)-1, 0.5)]
-        d = rng.binomial(int((m1-g)/2), 0.5) # g + 2*d <= m1
+        m1 = tmp[rng.binomial(len(tmp)-1, 0.3)]
+        d = rng.binomial(int((m1-g)/2), 0.75) # g + 2*d <= m1
         if g + d <= n and n - g - d <= m - m1 and d > 0:
             break
 
@@ -32,11 +32,14 @@ def add_row_redundancy(H_s: "galois.FieldArray", s: "galois.FieldArray", m2: int
     s_null_space = s.reshape((1, -1)).null_space()
 
     full_basis = row_space_H_s
+    # print(r, full_basis.shape, s_null_space.shape)
     for p in s_null_space:
         if not check_element(row_space_H_s.T, p):
             full_basis = np.concatenate((full_basis, p.reshape(1, -1)), axis=0)
-
+    
+    # print(full_basis.shape)
     R_s = full_basis[r:] # guarantee that rank(H) = n
+    # print(R_s.shape)
 
     while R_s.shape[0] < m2:
         p = sample_column_space(s_null_space.T, seed = rng)

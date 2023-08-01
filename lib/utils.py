@@ -232,8 +232,9 @@ def get_D_space(H: "galois.FieldArray", g):
     Get D = C \bigcap C^{\perp} 
     """
     H = H.column_space().T
+    n = H.shape[1]
     D = []
-    for i in range(H.shape[1] - g):
+    for i in range(n - g):
         for _ in range(10*2**g):
             c = random_codeword(H)
             if (H.T @ c == 0).all():

@@ -210,7 +210,7 @@ if __name__ == "__main__":
     # qrc_kernel_fig()
     # stab_kernel_fig()
     # fix_SB_fig()
-    # stab_scheme_fig()
+    stab_scheme_fig()
 
     stab_scheme_kernel_fig()
 
