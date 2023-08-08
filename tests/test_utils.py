@@ -1,7 +1,7 @@
 import numpy as np
 import galois
 from numpy.random import default_rng
-from lib.utils import wrap_seed, solvesystem, random_solution, get_D_space, get_H_s, check_D_doubly_even
+from lib.utils import wrap_seed, solvesystem, random_solution, get_D_space, get_H_s, check_D_doubly_even, check_element
 from lib.gen_matrix import sample_D
 from lib.construction import qrc_construction, stabilizer_construction
 
@@ -49,3 +49,12 @@ def test_get_D_space():
 def test_check_D_doubly_even():
     D = sample_D(8, 3)
     assert check_D_doubly_even(D)
+
+
+def test_check_element():
+    A = GF([[1, 0, 1], [0, 1, 1], [1, 1, 0]])
+    x = GF([1, 0, 1])
+    assert check_element(A, x)
+
+    x = GF([1, 1, 1])
+    assert not check_element(A, x)

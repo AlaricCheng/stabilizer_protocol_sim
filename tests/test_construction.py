@@ -11,7 +11,7 @@ GF = galois.GF(2)
 def test_stabilizer_construction(n, m, g):
     H, s = initialization(n, m, g)
     assert rank(H) == n
-    assert H.shape == (m, n) or H.shape == (m+1, n) # there should be a bug in add_row_redundancy or check_element
+    assert H.shape == (m, n) 
 
     H, s = stabilizer_construction(n, m, g)
     assert rank(H) == n

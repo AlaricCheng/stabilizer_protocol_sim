@@ -25,21 +25,17 @@ def add_row_redundancy(H_s: "galois.FieldArray", s: "galois.FieldArray", m2: int
     Generating R_s so that R_s.s = 0 and the joint row space of H_s and R_s is n
     """
     rng = wrap_seed(seed)
-    n = H_s.shape[1]
     r = rank(H_s)
 
     row_space_H_s = H_s.row_space()
     s_null_space = s.reshape((1, -1)).null_space()
 
     full_basis = row_space_H_s
-    # print(r, full_basis.shape, s_null_space.shape)
     for p in s_null_space:
-        if not check_element(row_space_H_s.T, p):
+        if not check_element(full_basis.T, p):
             full_basis = np.concatenate((full_basis, p.reshape(1, -1)), axis=0)
     
-    # print(full_basis.shape)
     R_s = full_basis[r:] # guarantee that rank(H) = n
-    # print(R_s.shape)
 
     while R_s.shape[0] < m2:
         p = sample_column_space(s_null_space.T, seed = rng)
@@ -134,6 +130,7 @@ def qrc_construction(n, m, q, seed = None):
     s = random_solution(H_s, u, seed = rng)
 
     R_s = add_row_redundancy(H_s, s, m-m1, seed = rng)
+    # print(H_s.shape, R_s.shape, rank(H_s))
     H = np.concatenate((H_s, R_s), axis=0)
 
     H, s = obfuscation(H, s, seed = rng)
