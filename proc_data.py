@@ -206,39 +206,13 @@ def stab_scheme_kernel_fig():
     fig.savefig("./fig/stab_scheme_kernel.svg", bbox_inches = "tight")
 
 
-def anti_concentration_fig():
-    fig, ax = plt.subplots(figsize = (6, 4))
-
-    for ctype in ["stab", "qrc"]:
-        labels = {"stab": "Stab. (g = 2)", "qrc": "QRC"}
-        with open(f"./data/moment_{ctype}.json", "r") as f:
-            moment = json.load(f)
-
-        n_values = list(map(int, moment.keys()))
-
-        moment_log = {int(k): [-np.log2(v) for v in moment[k]] for k in moment.keys()}
-        avg_moment_log = np.array([np.mean(v) for v in moment_log.values()])
-        std_moment_log = np.array([np.std(v) for v in moment_log.values()])
-        ax.plot(n_values, avg_moment_log, label = labels[ctype])
-        ax.fill_between(n_values, avg_moment_log - std_moment_log, avg_moment_log + std_moment_log, alpha = 0.2)
-
-    ax.set_xlabel("Number of qubits $n$", fontsize = fontsize)
-    ax.set_ylabel("$-\\log \\langle \\mathcal{Z}_{\\mathbf{s}} \\rangle$", fontsize = fontsize)
-    ax.tick_params(axis='both', labelsize=fontsize)
-
-    ax.legend(fontsize = fontsize)
-
-    fig.savefig("./fig/moment.svg", bbox_inches = "tight")    
-
-
 if __name__ == "__main__":
     # qrc_kernel_fig()
     # stab_kernel_fig()
     # fix_SB_fig()
     # stab_scheme_fig()
 
-    # stab_scheme_kernel_fig()
-    anti_concentration_fig()
+    stab_scheme_kernel_fig()
 
     # compared_with_qrc_fig()
 
