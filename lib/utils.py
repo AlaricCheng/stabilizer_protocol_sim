@@ -5,6 +5,7 @@ from numpy.random import default_rng
 import galois
 import os, sys
 import re
+import json, uuid
 
 GF = galois.GF(2)
 
@@ -97,7 +98,10 @@ def random_solution(A, b, seed = None):
     Generate a random solution to A x = b
     """
     rng = wrap_seed(seed)
-    s_sol, null = solvesystem(A, b)
+    try:
+        s_sol, null = solvesystem(A, b)
+    except ValueError:
+        return None
     if len(null) == 0:
         return s_sol
     else:
@@ -255,3 +259,10 @@ def check_D_doubly_even(D):
             if hamming_weight(c) % 4 != 0:
                 return False
     return True
+
+def dumpToUuid(payload):
+    fileName = "log/"+str(uuid.uuid4())+".json"
+
+    print("Dumping data to", fileName )
+    with open(fileName, "w") as f:
+        json.dump(payload, f) 

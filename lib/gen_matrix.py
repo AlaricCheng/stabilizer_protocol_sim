@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.random import default_rng
 import galois
+from sys import exit
 
 from lib.utils import check_element, rank, fix_basis, sample_column_space, hamming_weight, wrap_seed
 
@@ -98,6 +99,17 @@ def sample_D(m1, d, seed = None):
     u = GF.Ones((m1, 1))
     if check_element(D, u):
         D = fix_basis(u, D)
+
+    # As described in Appendix D, this routine might
+    # return a matrix with rank(D) < d.
+    # 
+    # The issue with that is that add_row_redundancy() will add rows until H
+    # has rank n.  But if rank(D)<d, this might require adding more than m2
+    # rows, so that the final matrix is longer than m.  This causes all kinds
+    # of trouble
+    if not rank(D) == d:
+        print("!! Failed to find D")
+        exit()
 
     return D
 
