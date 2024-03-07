@@ -14,5 +14,5 @@ The specific version of necessary python packages used are as follows.
 
 | Library  | Version |
 |----------|---------|
-| NumPy    | 1.23.4  |
-| galois   | 0.1.1   |
+| NumPy    | 1.25.2  |
+| galois   | 0.3.7   |

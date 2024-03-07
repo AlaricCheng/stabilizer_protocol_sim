@@ -141,46 +141,63 @@ def hammingRazor(
         p: float = 0.25,
         endurance: int = 100,
         verbose = True, 
-        secret = None):
-
-    # Runs Hamming's Razor Attack 
-    # Input: 
-    #   H -- m x n GF2 array
-    #   p -- float in [0,1]
-    #   E -- int > 0
-    # Returns:
-    #   s -- n x 1 GF2 array if successful
-    #        "False" if not successful
-
+        secret = None,
+        return_support = False
+    ):
+    """
+    Runs Hamming's Razor Attack 
+    Input: 
+      H -- m x n GF2 array
+      p -- float in [0,1]
+      E -- int > 0
+    Returns:
+      s -- n x 1 GF2 array if successful
+           "False" if not successful
+    """
     m = H.shape[0]
     support = np.zeros(m)
 
+    if verbose:
+        print(f"Hamming's razor (p = {p}) commencing...")
+
     for _ in range(endurance):
-        Sc = np.random.rand(m) > p
+        Sc = np.random.rand(m) > p 
         HSc = H[Sc,:]
 
         K = HSc.null_space().T
+        # for test, to check whether K has no support on FD
+        # if len(K.T) > 0: 
+        #     H_s = H[:300]
+        #     R_s = H[300:]
+        #     if (R_s @ K == 1).any():
+        #         print((H_s @ K == 0).all())
+        #         print((R_s @ K).T)
+        #         print(K.T[0][:80])
+        #         exit()
 
         support = compress(support + np.array(H@K)@np.ones(K.shape[1]))
     if verbose:
         print(f"Found {sum(support)} candidates for redundant rows")
+    support = support.view(GF)
 
     if secret is not None: # for test only
-        for i in support:
-            if np.inner(H[i], secret) != 0:
-                if verbose:
-                    print("!! Found a row that's not orthogonal to the secret")
-                return False
+        H_s_support = H @ secret
+        false_identified_rows_idx = np.intersect1d(H_s_support.nonzero()[0], support.nonzero()[0])
+        if false_identified_rows_idx.size > 0 and verbose:
+            print(f"Misfound {false_identified_rows_idx.size} rows that are not redundant")
 
-    sol = solvesystem(H,GF(np.ones(m,int)-support))
+            # return False
+    sol = solvesystem(H, GF.Ones(m)+support)
     if (len(sol)==0):
         if verbose:
             print("!! Can't realize support pattern linearly")
         s=False
     else:
         s=sol[0]
-
-    return (s)
+    
+    if return_support:
+        return s, support
+    return s
 
 
 def property_check(H, s_i, rank_thres=5):
@@ -224,11 +241,11 @@ def check_D_doubly_even(D):
     return True
 
 def get_H_s_with_zeros(H: "galois.FieldArray", s: 'galois.FieldArray'):
-        '''
-        Get H_s by setting rows that are orthogonal to s to zero
-        '''
-        idx = H @ s.reshape(-1, 1)
-        H_s = copy.deepcopy(H)
-        H_s[(idx != 1).flatten()] = 0
+    '''
+    Get H_s by setting rows that are orthogonal to s to zero
+    '''
+    idx = H @ s.reshape(-1, 1)
+    H_s = copy.deepcopy(H)
+    H_s[(idx != 1).flatten()] = 0
 
-        return H_s
+    return H_s

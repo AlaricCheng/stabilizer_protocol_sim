@@ -35,13 +35,13 @@ def test_solvesystem():
 def test_get_D_space():
     H, s = qrc_construction(5, 14, 7)
     H_s = get_H_s(H, s)
-    D = get_D_space(H_s, 1)
+    D = get_D_space(H_s)
 
     assert check_D_doubly_even(D)
 
-    H, s = stabilizer_construction(7, 14, 2)
+    H, s = stabilizer_construction(20, 50, 3, 20, 8, initAlg = 1)
     H_s = get_H_s(H, s)
-    D = get_D_space(H_s, 2)
+    D = get_D_space(H_s)
 
     assert check_D_doubly_even(D)
 

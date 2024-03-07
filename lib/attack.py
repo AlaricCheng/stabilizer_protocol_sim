@@ -17,7 +17,7 @@ def property_check(H, s_i, rank_thres = 5):
     g = rank(H_si.T @ H_si)
 
     if g <= rank_thres:
-        D = get_D_space(H_si, g)
+        D = get_D_space(H_si)
         if D is None:
             return True
         return check_D_doubly_even(D)

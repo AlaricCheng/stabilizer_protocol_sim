@@ -5,7 +5,7 @@ from lib.utils import hamming_weight, rank
 
 GF = galois.GF(2)
 
-@pytest.mark.parametrize("m1, d", [(8, 4), (7, 3), (6, 2), (9, 4)])
+@pytest.mark.parametrize("m1, d", [(30, 10), (40, 17), (50, 20)])
 def test_sample_D(m1, d):
     D = sample_D(m1, d)
     assert D.shape == (m1, d) or D.shape == (m1, d-1)
@@ -14,9 +14,9 @@ def test_sample_D(m1, d):
         assert (c.reshape(1, -1) @ D == 0).all()
 
 
-@pytest.mark.parametrize("m1, g", [(8, 2), (7, 1), (6, 2), (9, 3)])
+@pytest.mark.parametrize("m1, g", [(10, 2), (33, 3), (50, 4)])
 def test_sample_F(m1, g):
-    d = int((m1 - g)/2)
+    d = int((m1 - g)/2) - 2
     D = sample_D(m1, d)
     F = sample_F(m1, g, D)
 

@@ -9,7 +9,7 @@ def correlation_function(H: "galois.FieldArray", s: "galois.FieldArray"):
     g = rank(H_s.T @ H_s)
     m1, n = H_s.shape
 
-    D = get_D_space(H_s, g)
+    D = get_D_space(H_s)
     if not check_D_doubly_even(D): # if the dual intersection is not doubly-even
         return 0
 
