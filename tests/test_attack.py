@@ -28,7 +28,7 @@ def test_property_check(q):
 
     assert property_check(H, s, 1)
 
-    H, s = stabilizer_construction(n, m, 2)
+    H, s = stabilizer_construction(n, m, 2, initAlg = 1)
 
     assert property_check(H, s, 2)
 
@@ -47,7 +47,7 @@ def test_extract_one_secret(q):
 def test_sampling():
     n = 20
     m = 30
-    H, s = stabilizer_construction(n, m, 1)
+    H, s = stabilizer_construction(n, m, 1, initAlg = 1)
 
     beta = bias(H, s)
     

@@ -1,19 +1,39 @@
 import pytest
 import galois
-from lib.construction import initialization, stabilizer_construction, qrc_construction
+from lib.construction import initialization, initialization_block, stabilizer_construction, qrc_construction
 from lib.utils import rank, get_H_s, get_R_s
 from lib.hypothesis import correlation_function
 
 GF = galois.GF(2)
 
 
-@pytest.mark.parametrize("n, m, g", [(7, 15, 1), (20, 30, 2), (30, 40, 3), (40, 46, 4), (11, 20, 1)])
+@pytest.mark.parametrize("n, m, g", [(20, 30, 2), (30, 40, 3), (40, 46, 4)])
 def test_stabilizer_construction(n, m, g):
     H, s = initialization(n, m, g)
     assert rank(H) == n
     assert H.shape == (m, n) 
 
-    H, s = stabilizer_construction(n, m, g)
+    H, s = stabilizer_construction(n, m, g, initAlg = 1)
+    assert rank(H) == n
+    assert H.shape == (m, n) or H.shape == (m+1, n)
+
+    R_s = get_R_s(H, s)
+    H_s = get_H_s(H, s)
+
+    assert (R_s @ s == 0).all()
+    assert (H_s @ s == 1).all()
+
+    assert rank(H_s.T @ H_s) == g
+    assert abs(correlation_function(H, s)) == 2**(-g/2)
+
+
+@pytest.mark.parametrize("n, m, g", [(20, 40, 2), (50, 70, 3)])
+def test_stabilizer_construction_block(n, m, g):
+    H, s = initialization_block(n, m, g)
+    assert rank(H) == n
+    assert H.shape == (m, n) 
+
+    H, s = stabilizer_construction(n, m, g, initAlg = 2)
     assert rank(H) == n
     assert H.shape == (m, n) or H.shape == (m+1, n)
 

@@ -4,7 +4,7 @@ from numpy.random import default_rng
 import galois
 
 from lib.utils import check_element, rank, sample_column_space, hamming_weight, solvesystem, rand_inv_mat, wrap_seed, random_solution
-from lib.gen_matrix import sample_D, sample_F
+from lib.gen_matrix import sample_D, sample_F, complement_subspace_basis
 
 GF = galois.GF(2)
 
@@ -15,7 +15,7 @@ def sample_parameters(n, m, g, seed = None):
         tmp = [i for i in range(g, m, 2) if i >= 4 and i > g] # m1 = g mod 2, m1 > g
         m1 = tmp[rng.binomial(len(tmp)-1, 0.3)]
         d = rng.binomial(int((m1-g)/2), 0.75) # g + 2*d <= m1
-        if g + d <= n and n - g - d <= m - m1 and d > 0:
+        if g + d <= n and n - g - d < m - m1 and d > 0:
             break
 
     ## Routine would silently return bad parameters if no good set was found after 30 iterations (now increased to 100).
@@ -109,6 +109,66 @@ def initialization(n, m, g, m1=None, d=None, seed = None, rowAlgorithm=2):
     return H, s.reshape(-1, 1)
 
 
+def initialization_block(n, m, g, m1=None, d=None, d1 = None, seed = None):
+    """
+    Initialization of the stabilizer construction, where H_s = (F, D, 0)
+    and R_s = (A, B, C_1, C_2), where C_1 of size (m_2, d_1) generates a doubly-even code
+    """
+    rng = wrap_seed(seed)
+    if m1 is None or d is None:
+        m1, d = sample_parameters(n, m, g, seed = rng)
+    
+    # generate H_s
+    D = sample_D(m1, d, seed = rng)
+    zeros = GF.Zeros((m1, n-g-D.shape[1]))
+    if g == 0:
+        H_s = np.concatenate((D, zeros), axis=1)
+    else:
+        F = sample_F(m1, g, D, seed = rng)
+        H_s = np.concatenate((F, D, zeros), axis=1)
+    u = GF.Ones((m1, 1))
+    s = random_solution(H_s, u, seed = rng)
+    
+    # Generate R_s
+    m2 = m - m1
+    if d1 is None:
+        d1 = rng.choice(m2 - n + g + d) + 1
+    C1 = sample_D(m2, d1, seed = rng)
+    kernel_C1 = C1.T.null_space().T
+    kernel_C1_complement = complement_subspace_basis(kernel_C1, C1)
+    C2 = kernel_C1_complement[:, :n-g-d-d1]
+    AB = np.concatenate([sample_column_space(kernel_C1, seed = rng) for _ in range(g+d)], axis = 1)
+    R_s = np.concatenate((AB, C1, C2), axis = 1)
+    
+    supp_s = s.nonzero()[0]
+    if hamming_weight(s) == 1:
+        R_s[:, supp_s[0]] = GF.zeros(m2)
+    else:
+        j0 = rng.choice(supp_s)
+        R_s[:, j0] = np.concatenate([R_s[:, j:j+1] for j in supp_s if j != j0], axis = 1).sum(axis = 1)
+    
+    # get H
+    H = np.concatenate((H_s, R_s), axis=0)
+
+    ## test analytic estimates
+
+    #B  = R_s[:,g:g+d]
+    #C  = R_s[:,g+d:]
+    m2=m-m1
+    BC = R_s[:,g:]
+    G  = H.T@H
+
+    print("d", d)
+    print("m2", m2)
+    print("d1", d1)
+    print("m2 - rank(BC) =", m2 - rank(BC))
+    print("n - g - m2 =", n - g - m2)
+    print("slack in bound=", (n-rank(G))-(n-g-m2))
+
+
+    return H, s.reshape(-1, 1)
+
+
 def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray", seed = None):
     """
     H <-- P H Q and s <-- Q^{-1} s, 
@@ -125,12 +185,15 @@ def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray", seed = None):
     return H, s
 
 
-def stabilizer_construction(n, m, g, m1=None, d=None, seed = None, obfuscate=True, rowAlgorithm=2):
+def stabilizer_construction(n, m, g, m1=None, d=None, d1=None, seed = None, obfuscate=True, rowAlgorithm=2, initAlg = 2):
     """
     Generate an IQP matrix H and a secret s, so that the correlation function is 2^{-g/2}
     """
     rng = wrap_seed(seed)
-    H, s = initialization(n, m, g, m1, d, seed = rng,rowAlgorithm=rowAlgorithm)
+    if initAlg == 1:
+        H, s = initialization(n, m, g, m1, d, seed = rng,rowAlgorithm=rowAlgorithm)
+    elif initAlg == 2:
+        H, s = initialization_block(n, m, g, m1, d, d1, seed = rng)
 
     if obfuscate:
         H, s = obfuscation(H, s, seed = rng)

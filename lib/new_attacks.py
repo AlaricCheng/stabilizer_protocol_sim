@@ -1,6 +1,7 @@
 import numpy as np
 import galois
 from lib.utils import solvesystem, rank, wrap_seed, get_H_s, iter_column_space, hamming_weight
+import copy
 
 GF = galois.GF(2)
 
@@ -139,7 +140,8 @@ def hammingRazor(
         H: "galois.FieldArray", 
         p: float = 0.25,
         endurance: int = 100,
-        verbose = True):
+        verbose = True, 
+        secret = None):
 
     # Runs Hamming's Razor Attack 
     # Input: 
@@ -162,6 +164,13 @@ def hammingRazor(
         support = compress(support + np.array(H@K)@np.ones(K.shape[1]))
     if verbose:
         print(f"Found {sum(support)} candidates for redundant rows")
+
+    if secret is not None: # for test only
+        for i in support:
+            if np.inner(H[i], secret) != 0:
+                if verbose:
+                    print("!! Found a row that's not orthogonal to the secret")
+                return False
 
     sol = solvesystem(H,GF(np.ones(m,int)-support))
     if (len(sol)==0):
