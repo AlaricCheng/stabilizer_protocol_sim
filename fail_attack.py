@@ -137,7 +137,8 @@ def test_hamming_razor(n=300, m=500, g=10, m1=250, d=115, d1=84):
         H = GF(H)
         secret = GF(secret)
     else:
-        H, secret = stabilizer_construction(n, m, g, m1, d, d1, initAlg=2, obfuscate = False, AB_type = args.AB_type, concat_D = args.concat_D, concat_C1 = args.concat_C1, m0 = args.m0, d0 = args.d0)
+        initAlg = 3 if args.C_sparsity else 2
+        H, secret = stabilizer_construction(n, m, g, m1, d, d1, initAlg=initAlg, obfuscate = False, AB_type = args.AB_type, concat_D = args.concat_D, concat_C1 = args.concat_C1, m0 = args.m0, d0 = args.d0, C_sparsity = args.C_sparsity, B_sparsity = args.B_sparsity)
         if args.dump:
             dumpToUuid([H.tolist(),secret.tolist()])
 
@@ -203,6 +204,8 @@ if __name__ == "__main__":
     parser.add_argument("--AB-type", type=str, default="zero")
     parser.add_argument("--concat_D", action="store_true", help = "whether to use code concatenation for D")
     parser.add_argument("--concat_C1", action="store_true", help = "whether to use code concatenation for C_1")
+    parser.add_argument("--C_sparsity", type = int, help = "sparsity of C")
+    parser.add_argument("--B_sparsity", type = int, help = "sparsity of B")
     parser.add_argument("-m0", type = int, help = "length of the smaller code in the concatenated code")
     parser.add_argument("-d0", type = int, help = "dimension of the smaller code in the concatenated code")
     parser.add_argument("--dump", action="store_true")

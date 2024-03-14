@@ -3,8 +3,8 @@ from sys import exit
 import galois
 from pyldpc import make_ldpc
 
-from lib.utils import check_element, rank, sample_column_space, hamming_weight, solvesystem, rand_inv_mat, wrap_seed, random_solution, estimate_distance
-from lib.gen_matrix import sample_D, sample_F, random_doubly_even_vector, concatenated_D
+from lib.utils import check_element, rank, sample_column_space, hamming_weight, solvesystem, rand_inv_mat, wrap_seed, random_solution, estimate_distance, sample_sparse_vector
+from lib.gen_matrix import sample_D, sample_F, random_doubly_even_vector, concatenated_D, concatenated_code
 
 GF = galois.GF(2)
 
@@ -205,6 +205,20 @@ def initialization_block(n, m, g, m1=None, d=None, d1 = None, seed = None, conca
             R_s = np.concatenate((c, R_s), axis = 1)
     elif AB_type == "zero":
         R_s = np.concatenate((GF.Zeros((m2, g+d)), C), axis = 1)
+    elif AB_type == "concat":
+        # assert m2 % m0 == 0, "!!m2 % m0 != 0"
+        # k = m2 // m0
+        # assert d0 * k >= g+d, "!!d0 * k < g+d"
+        # for _ in range(20):
+        #     K_inner = GF.Random((g+d, g+d), seed = rng) 
+        #     if rank(K_inner) == g+d:
+        #         break
+        # K_inner = np.concatenate((K_inner, GF.Zeros((d0*k-g-d, g+d))), axis = 0)
+        # AB = concatenated_code(m2, g+d, m0, d0, K_inner)
+        # R_s = np.concatenate((AB, C), axis = 1)
+        AB = GF.Identity(g+d)
+        AB = np.concatenate((AB, GF.Zeros((m2-g-d, g+d))), axis = 0)
+        R_s = np.concatenate((AB, C), axis = 1)
     
     # set R_s.s = 0
     supp_s = s.nonzero()[0]
@@ -239,6 +253,63 @@ def initialization_block(n, m, g, m1=None, d=None, d1 = None, seed = None, conca
     return H, s.reshape(-1, 1)
 
 
+def initialization_sparse(n, m, g, m1=None, d=None, seed = None, m0 = None, d0 = None, C_sparsity = 10, B_sparsity = 10):
+    """
+    Initialization of the stabilizer construction, where H_s = (F, D, 0)
+    and R_s = (A, B, C_1, C_2), where 
+        - C_1 of size (m_2, d_1) generates a doubly-even code
+          d1 <= m2 - n + g + d 
+    """
+    rng = wrap_seed(seed)
+    if m1 is None or d is None:
+        m1, d = sample_parameters(n, m, g, seed = rng)
+    
+    # generate H_s
+    H_s, s = generate_H_s(n, g, m1, d, seed = rng, concat_D = True, m0 = m0, d0 = d0)
+
+    # Generate R_s
+    m2 = m - m1
+    C = sample_sparse_vector(m2, C_sparsity)
+    for _ in range(n-g-d-1):
+        c = sample_sparse_vector(m2, C_sparsity, C)
+        C = np.concatenate((C, c), axis = 1)
+    
+    BC = C
+    for _ in range(d):
+        c = sample_sparse_vector(m2, B_sparsity, BC)
+        BC = np.concatenate((c, BC), axis = 1)
+
+    R_s = np.concatenate((GF.Random((m2, g)), BC), axis = 1)
+    # set R_s.s = 0
+    supp_s = s.nonzero()[0]
+    if hamming_weight(s) == 1:
+        R_s[:, supp_s[0]] = 0
+    else:
+        try:
+            j0 = rng.choice(list(set(supp_s) & set(range(g))))
+        except:
+            j0 = rng.choice(list(set(supp_s) & set(range(g+d)))) # choose a random entry from the first g+d coordinates that are in supp_S
+        j0_mask = [j != j0 and j in supp_s for j in range(n)]
+        R_s[:, j0] = R_s[:, j0_mask].sum(axis = 1)
+
+    # get H
+    H = np.concatenate((H_s, R_s), axis=0)
+
+    ## test analytic estimates
+    m2=m-m1
+    G  = H.T@H
+
+    print("d", d)
+    print("m2", m2)
+    print("m2 - rank(BC) =", m2 - rank(BC))
+    print("n - g - m2 =", n - g - m2)
+    print("slack in bound=", (n-rank(G))-(n-g-m2))
+    print("relative distance (H_s, R_s, C and H):", estimate_distance(H_s)/m1, estimate_distance(R_s)/m2, estimate_distance(C)/m2, estimate_distance(H)/m)
+    print("dim ker(G) = ", n - rank(G))
+
+    return H, s.reshape(-1, 1)
+
+
 def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray", seed = None):
     """
     H <-- P H Q and s <-- Q^{-1} s, 
@@ -255,7 +326,7 @@ def obfuscation(H: "galois.FieldArray", s: "galois.FieldArray", seed = None):
     return H, s
 
 
-def stabilizer_construction(n, m, g, m1=None, d=None, d1=None, seed = None, obfuscate=True, rowAlgorithm=2, initAlg = 2, concat_D = False, m0 = None, d0 = None, AB_type = "zero", concat_C1 = False):
+def stabilizer_construction(n, m, g, m1=None, d=None, d1=None, seed = None, obfuscate=True, rowAlgorithm=2, initAlg = 2, concat_D = False, m0 = None, d0 = None, AB_type = "zero", concat_C1 = False, C_sparsity = 10, B_sparsity = 10):
     """
     Generate an IQP matrix H and a secret s, so that the correlation function is 2^{-g/2} 
     """
@@ -264,6 +335,8 @@ def stabilizer_construction(n, m, g, m1=None, d=None, d1=None, seed = None, obfu
         H, s = initialization(n, m, g, m1, d, seed = rng,rowAlgorithm=rowAlgorithm, concat_D = concat_D, m0 = m0, d0 = d0)
     elif initAlg == 2:
         H, s = initialization_block(n, m, g, m1, d, d1=d1, seed = rng, concat_D = concat_D, AB_type = AB_type, m0 = m0, d0 = d0, concat_C1 = concat_C1)
+    elif initAlg == 3:
+        H, s = initialization_sparse(n, m, g, m1, d, seed = rng, m0 = m0, d0 = d0, C_sparsity = C_sparsity, B_sparsity = B_sparsity)
 
     if obfuscate:
         H, s = obfuscation(H, s, seed = rng)

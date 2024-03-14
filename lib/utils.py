@@ -155,6 +155,27 @@ def sample_column_space(basis: 'galois.FieldArray', seed = None, low_weight = Fa
                 return c
 
 
+def sample_sparse_vector(m, sparsity, C = None, seed = None):
+    """
+    Sample a sparse vector that is not in the column span of C
+    """
+    rng = wrap_seed(seed)
+    for i in range(50):
+        if sparsity == 0:
+            c = GF.Random((m, 1), seed = rng)
+        else:
+            supp = rng.choice(m, sparsity)
+            c = GF.Zeros((m, 1))
+            c[supp] = 1
+        if C is None:
+            return c
+        if not check_element(C, c):
+            return c
+        if i == 49:
+            print("!! sampling sparse vector failed")
+            exit()
+
+
 def iter_column_space(basis: "galois.FieldArray"):
     """
     Iterate over the column space of basis. Use next() to get the next vector.

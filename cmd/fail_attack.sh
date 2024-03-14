@@ -64,3 +64,7 @@ python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 300 --AB-type ze
 python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 300 --AB-type zero --concat_D --concat_C1 -m0 60 -d0 28 --read log/ce76ddba-dde7-461b-b411-c2c14a8d1acb.json --p 0.2 --E 2000 --fine-tune
 
 python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 300 --AB-type zero --concat_D --concat_C1 -m0 60 -d0 28 --read log/ce76ddba-dde7-461b-b411-c2c14a8d1acb.json --p 0.3 --E 400 --fine-tune
+
+python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 0 --AB-type concat --concat_D -m0 30 -d0 14 --dump # log/79811830-56bc-4cd3-bcdd-ed943acdd5b7.json
+
+python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 0 --AB-type concat --concat_D -m0 30 -d0 14 --read log/79811830-56bc-4cd3-bcdd-ed943acdd5b7.json --p 0.3 --E 200 --fine-tune 

@@ -204,3 +204,18 @@ def concatenated_D(m1, d, m0, d0, K_inner):
     D = encoding_matrix @ K_inner
 
     return D
+
+
+def concatenated_code(m1, d, m0, d0, K_inner):
+    k = m1 // m0
+    assert K_inner.shape == (d0 * k, d), "The inner generator matrix must have shape (d0 * k, d)"
+
+    encoding_list = []
+    for _ in range(k):
+        encoding_list.append(GF.Random((m0, d0)))
+
+    encoding_matrix = GF(block_diag(*encoding_list)) 
+
+    D = encoding_matrix @ K_inner
+
+    return D
