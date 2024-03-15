@@ -68,3 +68,11 @@ python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 300 --AB-type ze
 python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 0 --AB-type concat --concat_D -m0 30 -d0 14 --dump # log/79811830-56bc-4cd3-bcdd-ed943acdd5b7.json
 
 python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 140 -d1 0 --AB-type concat --concat_D -m0 30 -d0 14 --read log/79811830-56bc-4cd3-bcdd-ed943acdd5b7.json --p 0.3 --E 200 --fine-tune 
+
+python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 135 -d1 0 --AB-type concat --concat_D -m0 20 -d0 9 --dump # log/7f03f30f-9e34-4e98-b90f-a62f9f513652.json
+
+python ./fail_attack.py -n 750 -m 1200 -g 10 -m1 300 -d 135 -d1 0 --AB-type concat --concat_D -m0 20 -d0 9 --read log/7f03f30f-9e34-4e98-b90f-a62f9f513652.json --p 0.3 --E 50 --fine-tune
+
+python ./fail_attack.py -n 700 -m 1200 -g 10 -m1 300 -d 135 -d1 0 --AB-type concat --concat_D -m0 20 -d0 9 --dump # log/1ca5d592-62ee-4275-bd04-387f9c622192.json
+
+python ./fail_attack.py -n 700 -m 1200 -g 10 -m1 300 -d 135 -d1 0 --AB-type concat --concat_D -m0 20 -d0 9 --read log/1ca5d592-62ee-4275-bd04-387f9c622192.json --p 0.35 --E 20 --fine-tune
