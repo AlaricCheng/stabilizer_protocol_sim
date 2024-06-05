@@ -165,15 +165,6 @@ def hammingRazor(
         HSc = H[Sc,:]
 
         K = HSc.null_space().T
-        # for test, to check whether K has no support on FD
-        # if len(K.T) > 0: 
-        #     H_s = H[:300]
-        #     R_s = H[300:]
-        #     if (R_s @ K == 1).any():
-        #         print((H_s @ K == 0).all())
-        #         print((R_s @ K).T)
-        #         print(K.T[0][:80])
-        #         exit()
 
         support = compress(support + np.array(H@K)@np.ones(K.shape[1]))
     if verbose:

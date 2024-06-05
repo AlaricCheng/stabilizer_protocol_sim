@@ -1,7 +1,6 @@
 import numpy as np
 from sys import exit
 import galois
-from pyldpc import make_ldpc
 
 from lib.utils import check_element, rank, sample_column_space, hamming_weight, solvesystem, rand_inv_mat, wrap_seed, random_solution, estimate_distance, sample_sparse_vector
 from lib.gen_matrix import sample_D, sample_F, random_doubly_even_vector, concatenated_D, concatenated_code

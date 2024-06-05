@@ -3,7 +3,7 @@ from numpy.random import default_rng
 import galois
 from scipy.linalg import block_diag
 from sys import exit
-import multiprocessing
+# import multiprocessing
 
 from lib.utils import check_element, rank, fix_basis, sample_column_space, hamming_weight, wrap_seed
 
@@ -26,37 +26,37 @@ def random_doubly_even_vector(m1, seed = None, low_weight = True):
     return vector
 
 
-# def sample_even_parity_vector(basis: "galois.FieldArray", seed = None):
-#     """
-#     Sample a random vector of even parity from the column space of basis
-#     """
-#     rng = wrap_seed(seed)
-#     for _ in range(20):
-#         a = sample_column_space(basis, seed = rng)
-#         if hamming_weight(a) % 2 == 0 and hamming_weight(a) != 0:
-#             return a
-
-def sample_even_parity_vector_worker(args):
-    basis, seed = args
-    assert type(seed) == int
-    a = sample_column_space(basis, seed = seed)
-    if hamming_weight(a) % 2 == 0 and hamming_weight(a) != 0:
-        return a
-
-
 def sample_even_parity_vector(basis: "galois.FieldArray", seed = None):
     """
     Sample a random vector of even parity from the column space of basis
     """
     rng = wrap_seed(seed)
-    num_processes = multiprocessing.cpu_count() // 2
-    pool = multiprocessing.Pool(processes=num_processes)
-    seeds = rng.choice(2**32, 20, replace = False)
-    results = pool.map(sample_even_parity_vector_worker, [(basis, int(seed)) for seed in seeds])
+    for _ in range(20):
+        a = sample_column_space(basis, seed = rng)
+        if hamming_weight(a) % 2 == 0 and hamming_weight(a) != 0:
+            return a
 
-    for result in results:
-        if result is not None:
-            return result
+# def sample_even_parity_vector_worker(args):
+#     basis, seed = args
+#     assert type(seed) == int
+#     a = sample_column_space(basis, seed = seed)
+#     if hamming_weight(a) % 2 == 0 and hamming_weight(a) != 0:
+#         return a
+
+
+# def sample_even_parity_vector(basis: "galois.FieldArray", seed = None):
+#     """
+#     Sample a random vector of even parity from the column space of basis
+#     """
+#     rng = wrap_seed(seed)
+#     num_processes = multiprocessing.cpu_count() // 2
+#     pool = multiprocessing.Pool(processes=num_processes)
+#     seeds = rng.choice(2**32, 20, replace = False)
+#     results = pool.map(sample_even_parity_vector_worker, [(basis, int(seed)) for seed in seeds])
+
+#     for result in results:
+#         if result is not None:
+#             return result
 
 
 def sample_odd_parity_vector(basis: "galois.FieldArray", seed = None):
